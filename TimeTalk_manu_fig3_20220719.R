@@ -1,7 +1,12 @@
+####TimeTalk manuscript
+####Author:wlt
 ####Fig3
 ####20211003
-####count Ligand receptor gene ratio
+####eLR validation
 ####edit this in 20211021
+####20220318
+####20220411: will modify this code to stable version
+
 rm(list = ls())
 ####----0.1 load package--------
 library(EnrichedHeatmap)
@@ -28,332 +33,79 @@ library(patchwork)
 library(GenomicFeatures)
 source(file = "code/myUtils.R")
 library(readxl)
+library(cellcall)
 futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
-
-
-####----0.2 define color------
-rdbu <- colorRampPalette(rev(RColorBrewer::brewer.pal(11,"RdBu"))) 
-test.color.2 <- colorRampPalette(c("Orange","lightgoldenrod","darkgreen"))
-col.spectral <- colorRampPalette(brewer.pal(11,'Spectral')[-6])
-test.color.3 <- colorRampPalette(c("#f86e11","#e9970a","#71a701","#62b474","#71c3ac","#9fc4ca"))
-rdwhbu <- colorRampPalette(c("navy", "white", "brown3"))
-skyblueYelow <- colorRampPalette(c("#6db0d2","black","#f1e63d"))
-skybluered <- colorRampPalette(c("skyblue","black","orange"))
-solarExtra <- colorRampPalette(c("#3361A5","#248AF3","#14B3FF","#88CEEF","#C1D5DC","#EAD397","#FDB31A","#E42A2A","#A31D1D"))
-hic.red <- colorRampPalette(c("white", "red"))
-hic.orred <- colorRampPalette(colors = c(brewer.pal(9,"Reds")))
-blues <- colorRampPalette(colors = brewer.pal(9,"Blues"))
-ylord <- colorRampPalette(colors = brewer.pal(9,"YlOrRd"))
-strike_freedom_gundam_color <- c("#f6383e","#eff3ff","#1f55d9","#373b35","#b1b0c2","#f2be58")
-scales::show_col(strike_freedom_gundam_color)
-
-
-scales::show_col(blues(10))
-scales::show_col(ylord(10))
-###hic.pca.red <- colorRampPalette(c("#1a469c","black","#e7141a"))
-hic.pca.red <- colorRampPalette(c("blue","gray1","red"))
-hic.pca.redwhite <- colorRampPalette(c("#1d1856","navyblue","white","red4","#861617"))
-hic.pca.orange <- colorRampPalette(c("#2f2583","black","#f9b232"))
-hic.pca.skyblue <- colorRampPalette(c("skyblue","black","orange"))
-hic.pca.gundam <- colorRampPalette(strike_freedom_gundam_color[1:3])
-
-#mycolor.bar(hic.pca.red(100),min = -1,max = 1)
-divergentcolor <- function (n) {
-  colorSpace <- c("#E41A1C", "#377EB8", "#4DAF4A", 
-                  "#984EA3", "#F29403", "#F781BF", "#BC9DCC", 
-                  "#A65628", "#54B0E4", "#222F75", "#1B9E77", 
-                  "#B2DF8A", "#E3BE00", "#FB9A99", "#E7298A", 
-                  "#910241", "#00CDD1", "#A6CEE3", "#CE1261", 
-                  "#5E4FA2", "#8CA77B", "#00441B", "#DEDC00", 
-                  "#B3DE69", "#8DD3C7", "#999999")
-  if (n <= length(colorSpace)) {
-    colors <- colorSpace[1:n]
-  }
-  else {
-    colors <- (grDevices::colorRampPalette(colorSpace))(n)
-  }
-  return(colors)
-}
-divergentcolor.gundam <- function(n){
-  if(n <= length(strike_freedom_gundam_color)){
-    colors <- strike_freedom_gundam_color[1:n]
-  }
-  else{
-    colors <- (grDevices::colorRampPalette(strike_freedom_gundam_color))(n)
-  }
-}
-
-navy <- colorRampPalette(colors = c("#3e56a6", "#fffbfb", "#ee252a"))
-cold <- colorRampPalette(c('#f7fcf0','#41b6c4','#253494','#081d58'))
-warm <- colorRampPalette(c('#ffffb2','#fecc5c','#e31a1c','#800026'))
-mypalette <- c(rev(cold(21)), warm(20))
-coldwarm <- colorRampPalette(colors = mypalette)
-
-bkcolor <- c(colorRampPalette(c(brewer.pal(9,"Blues" )[4:9],"#1a1919"))(50),
-             colorRampPalette(c("#1a1919",rev(brewer.pal( 9,"YlOrBr" ))[1:6]))(50))
-
-bkcolor <- colorRampPalette(colors = bkcolor)
-mycolor.bar(bkcolor(100),min = -1)
-mycolor.bar(blues(10),min = -1)
-coffeshop <- colorRampPalette(colors =c("#dd9b53","#d25b12","seagreen3","#c2a38a","#b8a896","grey"))
-scales::show_col(colours = coffeshop(8))
-scales::show_col(divergentcolor(15))
-
-
-scales::show_col(colorRampPalette(c("#00bcd4","lightgrey","#ffeb3b"))(5))
-
-
-shaman.color <- c(c("#08306b","#084d96","#3f51b5","#2196f3","#03a9f4","#00bcd4"),
-                  colorRampPalette(c("#00bcd4","lightgrey","#ffeb3b"))(5)[2:4],
-                  rev(c("#800026","#B60026","#ff5722","#ff9800","#ffc107","#ffeb3b")))
-
-shaman.color <- colorRampPalette(colors = shaman.color)
-
-par(mfrow=c(2,2))
-mycolor.bar(shaman.color(100),min = -1,vertical = F)
-mycolor.bar(rdbu(100),min = -1,vertical = F)
-mycolor.bar(coldwarm(100),min = -1,vertical = F)
-mycolor.bar(solarExtra(100),min = -1,vertical = F)
-dev.off()
-scales::show_col(solarExtra(5))
-scales::show_col(shaman.color(11))
-
-
-tmp.color <- rev(c("#f4ea0c","#ffc807",
-                   "#f6901f","#f05e23",
-                   "#ed3324","#ec1c25",
-                   "#bc243c","#8d3966",
-                   "#5a5391","#366cb3",
-                   "#1f65af","#174c81",
-                   "#163256","#0e192a",
-                   "#000000"))
-bkro <- colorRampPalette(colors = tmp.color)
-mycolor.bar(hic.pca.gundam(100),min = -1)
 
 ####-----------1. visualization of eLR screen---------------------
 
-
-tmp.res.cor.1 <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-
-####plot
-cutoff <- 0.1
-data.plot <- tmp.res.cor.1 %>%
-  mutate(Rank=1:nrow(tmp.res.cor.1)) %>%
-  mutate(group=ifelse(PCC > cutoff,"p-eLR",ifelse(PCC < -cutoff,"n-eLR","not sig"))) %>%
-  mutate(group=factor(group,levels = c("p-eLR","not sig","n-eLR"))) %>%
-  mutate(LRpairs=gsub(x = LRpairs,pattern = "_",replacement = "-"))
-
-
-
-
-tmp.show <- 5
-tmp.label.1 <- data.plot %>%
-  head(tmp.show) %>%
-  pull(LRpairs)
-
-tmp.label.2 <- data.plot %>%
-  tail(tmp.show) %>%
-  pull(LRpairs)
-
-tmp.label <- c(tmp.label.1,tmp.label.2)
+####prepare data
+tmp.color <- c("brown3","navy","#f2be58","grey")
+names(tmp.color) <-  c("forward","backward","feedback","background")
+data.plot <- readRDS(file = "res/R/putative_eLR_pairs_1094_2022032109.rds")
+data.plot <- data.plot %>%
+  filter(abs(PCC) > 0.1) %>%
+  #filter(LRtoTF < 0.01 | TFtoLR < 0.01) %>%
+  mutate(LRpairs = paste0(Lgene,"-",Rgene)) %>%
+  mutate(group = "background") %>%
+  mutate(group = ifelse(LRtoTF < 0.01 & TFtoLR > 0.01,"forward",group)) %>%
+  mutate(group = ifelse(LRtoTF > 0.01 & TFtoLR < 0.01,"backward",group)) %>%
+  mutate(group = ifelse(LRtoTF < 0.01 & TFtoLR < 0.01,"feedback",group)) %>%
+  mutate(group = factor(group,levels = c("forward","backward","feedback","background"))) %>%
+  mutate(LRtoTF=-log10(LRtoTF)) %>%
+  mutate(TFtoLR=-log10(TFtoLR))
 
 
-p <- ggplot(data.plot,aes(Rank,PCC,color=group,label=ifelse(LRpairs %in% tmp.label,LRpairs,"")))+
-  geom_point(alpha=0.8)+
-  geom_text_repel(box.padding = 0.5,
-                  max.overlaps = Inf)+
-  scale_color_manual(values = c("#c00000","grey","#0070c0"))+
-  guides(color = guide_legend(override.aes = aes(label = "")))+
-  scale_x_continuous(breaks = seq(0,1200,100),labels = seq(0,1200,100))+
-  scale_y_continuous(breaks = seq(-1,1,0.2),labels = seq(-1,1,0.2))+
-  geom_hline(yintercept = cutoff,linetype="dotdash")+
-  geom_hline(yintercept = -cutoff,linetype="dotdash")+
-  theme_cowplot(font_size = 18)+
-  theme(axis.line = element_line(size = 1))
-p
-ggsave(p,filename = myFileName(prefix = "res/fig/Fig3_eLR_show_top5",suffix = ".jpg"),
-       width = 9,height = 9,dpi = 350)
-
-
-tmp.label <- c("Fgf4-Fgfr1","Fgf4-Fgfr2","Bmp4-Bmpr2",
-               "Gdf9-Bmpr1b","Ntn1-Dcc","Ntn1-Unc5b",
+tmp.label <- c("Fgf4-Fgfr1","Fgf4-Fgfr2","Bmp6-Bmpr2",
+               "Gdf9-Bmpr1b","Ntn1-Dcc",
                "Rspo2-Lgr5","Rspo2-Lgr6",'Hbegf-Erbb4',
-               "Pdgfc-Pdgfra","Igf2-Igf2r",
                "Ctsd-Lrp1")
 
-p <- ggplot(data.plot,aes(Rank,PCC,color=group,label=ifelse(LRpairs %in% tmp.label,LRpairs,"")))+
-  geom_point(alpha=0.8,size=6)+
+
+p <- ggplot(data.plot,aes(LRtoTF,TFtoLR,color=group,label=ifelse(LRpairs %in% tmp.label,LRpairs,"")))+
+  geom_point(size=3,alpha=0.8)+
   geom_text_repel(box.padding = 0.5,
-                  size=6,fontface = "italic",
+                  size=6, 
+                  segment.curvature = 0.3,
+                  segment.size  = 1,
+                  force = 400,
+                  fontface = "italic",
+                  seed = 46,
+                  arrow = arrow(length = unit(0.03, "npc")),
                   max.overlaps = Inf)+
-  scale_color_manual(values = c("#c00000","grey","#0070c0"),name=NULL)+
-  guides(color = guide_legend(override.aes = aes(label = "")))+
-  scale_x_continuous(breaks = seq(0,1200,100),labels = seq(0,1200,100))+
-  scale_y_continuous(breaks = seq(-1,1,0.2),labels = seq(-1,1,0.2),limits = c(-1,1))+
-  geom_hline(yintercept = cutoff,linetype="dotdash")+
-  geom_hline(yintercept = -cutoff,linetype="dotdash")+
-  theme_cowplot(font_size = 30)+
+  geom_hline(yintercept = 2,linetype="dotdash")+
+  geom_vline(xintercept = 2,linetype="dotdash")+
+  scale_color_manual(values = tmp.color,name=NULL,
+                     guide=guide_legend(nrow = 2))+
+  guides(color = guide_legend(override.aes = aes(label = ""),nrow = 2))+
+  scale_x_continuous(breaks = seq(0,16,by=2))+
+  scale_y_continuous(breaks = seq(0,16,by=2))+
+  xlab(expression(-log[10](P[LRtoTF])))+
+  ylab(expression(-log[10](P[TFtoLR])))+
+  theme_cowplot(font_size = 28)+
   theme(axis.line = element_line(size = 2),
         axis.ticks = element_line(size = 2),
-        axis.text.x = element_text(angle = 45,vjust = 0.5),
-        legend.position = "top")
-p
-ggsave(p,filename = myFileName(prefix = "res/fig/Fig3_eLR_show_known",suffix = ".jpg"),
-       width = 8,height = 8,dpi = 350)
+        legend.position = "top",legend.justification = "center")
+p  
+myggsave(p = p,prefix = "res/fig/Fig3a_show_eLR_result",suffix = ".png",width = 8,height = 6,dpi = 350)
+myggsave(p = p,prefix = "res/fig/Fig3a_show_eLR_result",suffix = ".pdf",width = 8,height = 6,dpi = 350)
+
+colnames(data.plot)[8:9] <- c("-log10(LRtoTF_ens)","-log10(TFtoLR_ens)")
+
+write.table(data.plot,
+            file = myFileName(prefix = "res/txt/candidate_eLR",suffix = ".txt"),
+            quote = F,
+            row.names = F,
+            sep = "\t")
 
 
-####plot for model
-p <- ggplot(data.plot,aes(Rank,PCC,color=group,label=ifelse(LRpairs %in% tmp.label,LRpairs,"")))+
-  geom_point(alpha=0.8,size=3)+
-  # geom_text_repel(box.padding = 0.5,
-  #                 max.overlaps = Inf)+
-  scale_color_manual(name=NULL,
-                     values = c("#c00000","grey","#0070c0"),
-                     labels = c("p-eLR(322)","not sig","n-eLR(132)"))+
-  #guides(color = guide_legend(override.aes = aes(label = "")))+
-  scale_x_continuous(breaks = seq(0,1200,100),
-                     labels = seq(0,1200,100))+
-  scale_y_continuous(breaks = seq(-1,1,0.2),
-                     labels = seq(-1,1,0.2),
-                     limits = c(-1,1))+
-  geom_hline(yintercept = cutoff,linetype="dotdash",)+
-  geom_hline(yintercept = -cutoff,linetype="dotdash")+
-  theme_cowplot(font_size = 18)+
-  theme(axis.line = element_line(size = 1))
-p
-ggsave(p,filename = myFileName(prefix = "res/fig/Fig3_eLR_show_formodel",
-                               suffix = ".pdf"),
-       width = 8,height = 8,dpi = 350)
+#####--------2. nichenet----------
+#####there are some problem here, so this section is ommit here
 
 
 
-
-
-####----2. overlap with ZGA gene------
-
-####----2.1 load data-------
-
-
-### LR gene
-LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_20210115.rds")
-Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
-Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
-Lgene <- unique(Lgenelist)
-Rgene <- unique(Rgenelist)
-LRgene <- c(Lgene,Rgene)
-LRgene <- intersect(LRgene,mm9.gene.list)
-LRgene.all <- LRgene
-
-
-####eLR gene
-tmp.res.cor.1 <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-cutoff <- 0.1
-tmp.LR.pairs <- tmp.res.cor.1 %>%
-  dplyr::filter(abs(PCC) > cutoff) %>%
-  pull(LRpairs)
-tmp.L <- unlist(lapply(strsplit(tmp.LR.pairs,split = "_"),FUN = function(x) x[1])) 
-tmp.R <- unlist(lapply(strsplit(tmp.LR.pairs,split = "_"),FUN = function(x) x[2]))
-tmp.L.gene  <- unique(tmp.L)
-tmp.R.gene  <- unique(tmp.R)
-eLR_gene <- c(tmp.L.gene,tmp.R.gene)
-
-
-
-
-
-
-# reprogramming_factor_candidate <- read.delim(file = "database/genes_365_for_iPSCs_202001303_DBTMEE.tsv",
-#                                              sep = "\t",stringsAsFactors = F) %>%
-#   pull("Gene")
-zga_gene_zhangyi <- read_delim(file = "database/other_ZGA/Nfya_KD_zhangyi.txt",delim = "\t") %>%
-  pull(gene)
-genelist <- list(eLR_gene=eLR_gene,
-                 zga_gene=zga_gene_zhangyi)
-
-####-----2.2 plot-----------
-
-###draw venn diagram
-scales::show_col(colours = shaman.color(20))
-scales::show_col(colours = c("#84c683","#fec04e"))
-scales::show_col(colours = c("#E69F00","#009E73"))
-tmp.color <- c("#80bda0","#e0ac61")
-scales::show_col(ggthemes::colorblind_pal()(9))
-
-
-genelist <- list(zga_gene=zga_gene_zhangyi,
-                eLR_gene=eLR_gene)
-
-#### get pvalue
-library(EnsDb.Mmusculus.v79)
-mm10_gene <- genes(EnsDb.Mmusculus.v79)
-mm10_gene <- as.data.frame(mm10_gene)
-mm10_gene <- mm10_gene %>%
-  dplyr::filter(gene_biotype == "protein_coding")
-mm10_gene.set <- mm10_gene$symbol
-
-k <- length(intersect(eLR_gene,zga_gene_zhangyi))
-M <- length(zga_gene_zhangyi)
-N <- length(mm10_gene.set)
-n <- length(eLR_gene)
-x <- M/N
-y <- k/n
-pvalue <- phyper(k-1,M,N-M,n,lower.tail = F)
-
-tmp.df <- data.frame(value=c(x,y),group=c("expected","observed"))
-ggplot(tmp.df,aes(group,value,fill=group))+
-  geom_bar(stat = "identity")+
-  ggsignif::geom_signif(comparisons = list(c("expected","observed")),
-                        annotations = paste0("p=",round(pvalue,6)),
-                        tip_length = 0.3,
-                        size = 2,y_position = 0.15,
-                        textsize = 10)+
-  xlab(NULL)+
-  ylab("ratio")+
-  scale_fill_manual(values = c("#80bda0","#e0ac61"))+
-  scale_x_discrete(labels=c("ZGA gene","eLR gene"))+
-  scale_y_continuous(limits = c(0,0.18),expand = c(0,0))+
-  theme(legend.position = "none")+
-  theme_cowplot(font_size = 45)+
-  theme(axis.line = element_line(size = 2),
-        axis.text.x = element_text(angle = 30,hjust = 0.5,vjust = 0.8),
-        axis.ticks = element_line(size = 2),
-        legend.position = "none")  
-ggsave(filename = myFileName(prefix = "res/fig/fig3_bar",suffix = ".png"),width = 6,height = 8,dpi = 350)
-
-png(myFileName(prefix = paste0("res/fig/fig3_venn_zga_gene"),
-               suffix = ".png"),units = "in",res = 350,
-    width = 8,height = 8)
-plot(eulerr::euler(genelist,shape = "ellipse"),
-     quantities = list(fontsize=30),
-     label=list(fontsize=30),
-     fill=tmp.color,
-     main=list(label=paste0("p=",sprintf("%0.3f",pvalue)),fontsize=24),
-     col="black")
-dev.off()
-?euler
-
-pdf(myFileName(prefix = paste0("res/fig/fig3_venn_zga_gene"),
-               suffix = ".pdf"),
-    width = 8,height = 8)
-plot(eulerr::euler(genelist,shape = "ellipse"),
-     quantities = list(fontsize=30),
-     label=list(fontsize=30),
-     fill=tmp.color,
-     main=list(label=paste0("p=",sprintf("%0.3f",pvalue)),fontsize=24),
-     col="black")
-dev.off()
-
-
-
-
-#####--------3. nichenet----------
-
-
-
-######---------3.2.1 load data------------
+######---------2.1 load data------------
 early.scRNAseq.exp <- readRDS(file = "res/R/early.scRNAseq.exp_20210114.rds")
 early.scRNAseq.meta <- readRDS(file = "res/R/early.scRNAseq.meta_20210114.rds")
-
 ligand_target_matrix = readRDS("res/R/nichenet_ligand_target_matrix.rds")
 lr_network <- readRDS(file = "res/R/nichenet_lr_network_mouse.rds")
 mouse_sig_network <- readRDS(file = "res/R/nichenet_mouse_sig_network.rds")
@@ -390,12 +142,6 @@ lr_network_expressed = lr_network %>%
 head(lr_network_expressed)
 
 potential_ligands = lr_network_expressed %>% pull(from) %>% unique()
-
-
-
-
-
-
 
 ########--------3.2.4 Perform NicheNet’s ligand activity analysis on the gene set of interest--------
 ligand_activities = predict_ligand_activities(geneset = geneset_oi, 
@@ -597,10 +343,8 @@ dev.off()
 mm9KG_txdb <- makeTxDbFromGFF(file = "D://Ubuntu/wlt/igenomes/Mus_musculus/UCSC/mm9/Annotation/genes.gtf")
 mm9.gene <- genes(mm9KG_txdb)
 mm9.gene.list <- mm9.gene$gene_id
-
 test <- transcripts(mm9KG_txdb)
 test <- exons(mm9KG_txdb)
-??GenomicFeatures
 
 columns(mm9KG_txdb)
 library(TxDb.Mmusculus.UCSC.mm9.knownGene)
@@ -627,7 +371,7 @@ head(essential.gene)
 essential.gene <- intersect(essential.gene,mm9.gene.list)
 
 ### LR gene
-LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_20210115.rds")
+LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_2022031117.rds")
 Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
 Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
 Lgene <- unique(Lgenelist)
@@ -648,12 +392,13 @@ tmp.df.1 <- data.frame(value = c(x,y),group=c("all","LR"),stringsAsFactors = F)
 pvalue.list <- p
 
 ####-------4.1.2 eLR------------------
-tmp.df <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-LRpairs <- tmp.df %>%
-  dplyr::filter(abs(PCC) > 0.1) %>%
-  pull(LRpairs)
-Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
-Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
+eLR.df <- readRDS(file = "res/R/eLR_row_annotaion_df_2022032700.rds") %>%
+  rownames_to_column("LRpairs") %>%
+  mutate(Lgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[1]}))) %>%
+  mutate(Rgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[2]})))
+
+Lgenelist <- eLR.df$Lgene 
+Rgenelist <- eLR.df$Rgene
 Lgene <- unique(Lgenelist)
 Rgene <- unique(Rgenelist)
 LRgene <- c(Lgene,Rgene)
@@ -703,12 +448,18 @@ ggplot(tmp.df,aes(group,value,fill=group))+
         axis.line = element_line(size = 2),
         axis.ticks = element_line(size = 2))
 ggsave(filename = myFileName(prefix = "res/fig/Fig3_essential_gene_enrichment",
-                             suffix = ".png"),width = 8,height = 8,dpi = 350)
+                             suffix = ".png"),
+       width = 8,height = 8,dpi = 350)
+
+ggsave(filename = myFileName(prefix = "res/fig/Fig3_essential_gene_enrichment",
+                             suffix = ".pdf"),
+       width = 8,height = 8,dpi = 350)
 
 #####---------4.1.3 euler plot---------
 tmp.list <- list(all = essential.gene,
                  LR = LRgene.all,
                  eLR = eLRgene)
+names(tmp.list)[1] <- "Essential gene"
 png(filename = myFileName(prefix = "res/fig/Fig3_essential_gene_euler",suffix = ".png"),
     width = 8,height = 8,units = "in",bg = "grey",res = 350)
 ####beacuse venn digaram involved random
@@ -748,7 +499,8 @@ HK.gene <- tmp.df %>%
 HK.gene <- intersect(HK.gene,mm9.gene.list)
 
 ### LR gene
-LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_20210115.rds")
+### LR gene
+LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_2022031117.rds")
 Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
 Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
 Lgene <- unique(Lgenelist)
@@ -769,12 +521,13 @@ tmp.df.1 <- data.frame(value = c(x,y),group=c("all","LR"),stringsAsFactors = F)
 pvalue.list <- p
 
 ####-------4.2.2 eLR------------------
-tmp.df <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-LRpairs <- tmp.df %>%
-  dplyr::filter(abs(PCC) > 0.1) %>%
-  pull(LRpairs)
-Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
-Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
+eLR.df <- readRDS(file = "res/R/eLR_row_annotaion_df_2022032700.rds") %>%
+  rownames_to_column("LRpairs") %>%
+  mutate(Lgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[1]}))) %>%
+  mutate(Rgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[2]})))
+Lgenelist <- eLR.df$Lgene 
+Rgenelist <- eLR.df$Rgene
+
 Lgene <- unique(Lgenelist)
 Rgene <- unique(Rgenelist)
 LRgene <- c(Lgene,Rgene)
@@ -824,12 +577,19 @@ ggplot(tmp.df,aes(group,value,fill=group))+
         axis.line = element_line(size = 2),
         axis.ticks = element_line(size = 2))
 ggsave(filename = myFileName(prefix = "res/fig/Fig3_HK_gene_enrichment",
-                             suffix = ".png"),width = 8,height = 8,dpi = 350)
+                             suffix = ".png"),
+       width = 8,height = 8,dpi = 350)
 
+ggsave(filename = myFileName(prefix = "res/fig/Fig3_HK_gene_enrichment",
+                             suffix = ".pdf"),
+       width = 8,height = 8,dpi = 350)
 ####--------4.2.3 euler plot---------------
 tmp.list <- list(all = HK.gene,
                  LR = LRgene.all,
                  eLR = eLRgene)
+
+names(tmp.list)[1] <- "Housekeeping gene"
+
 png(filename = myFileName(prefix = "res/fig/Fig3_HK_gene_euler",suffix = ".png"),
     width = 8,height = 8,units = "in",bg = "grey",res = 350)
 ####beacuse venn digaram involved random
@@ -859,8 +619,6 @@ dev.off()
 
 
 
-
-
 ####--------4.3 ZGA gene overlap--------------
 
 ###-------4.3.1 LR--------
@@ -871,7 +629,7 @@ zga_gene_zhangyi <- read_delim(file = "database/other_ZGA/Nfya_KD_zhangyi.txt",d
 zga_gene_zhangyi <- intersect(zga_gene_zhangyi,mm9.gene.list)
 
 ### LR gene
-LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_20210115.rds")
+LRpairs <- readRDS(file = "res/R/cytotalkdb_LRpairs_2022031117.rds")
 Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
 Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
 Lgene <- unique(Lgenelist)
@@ -892,12 +650,12 @@ tmp.df.1 <- data.frame(value = c(x,y),group=c("all","LR"),stringsAsFactors = F)
 pvalue.list <- p
 
 ####-------4.3.2 eLR------------------
-tmp.df <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-LRpairs <- tmp.df %>%
-  dplyr::filter(abs(PCC) > 0.1) %>%
-  pull(LRpairs)
-Lgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[1])) 
-Rgenelist <- unlist(lapply(strsplit(LRpairs,split = "_"),FUN = function(x) x[2])) 
+eLR.df <- readRDS(file = "res/R/eLR_row_annotaion_df_2022032700.rds") %>%
+  rownames_to_column("LRpairs") %>%
+  mutate(Lgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[1]}))) %>%
+  mutate(Rgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ ii[2]})))
+Lgenelist <- eLR.df$Lgene 
+Rgenelist <- eLR.df$Rgene
 Lgene <- unique(Lgenelist)
 Rgene <- unique(Rgenelist)
 LRgene <- c(Lgene,Rgene)
@@ -947,12 +705,17 @@ ggplot(tmp.df,aes(group,value,fill=group))+
         axis.line = element_line(size = 2),
         axis.ticks = element_line(size = 2))
 ggsave(filename = myFileName(prefix = "res/fig/Fig3_ZGA_gene_enrichment",
-                             suffix = ".png"),width = 8,height = 8,dpi = 350)
+                             suffix = ".png"),
+       width = 8,height = 8,dpi = 350)
+ggsave(filename = myFileName(prefix = "res/fig/Fig3_ZGA_gene_enrichment",
+                             suffix = ".pdf"),
+       width = 8,height = 8,dpi = 350)
 
 ####--------4.3.3 euler plot---------------
 tmp.list <- list(all = zga_gene_zhangyi,
                  LR = LRgene.all,
                  eLR = eLRgene)
+names(tmp.list)[1] <- "ZGA gene"
 png(filename = myFileName(prefix = "res/fig/Fig3_ZGA_gene_euler",suffix = ".png"),
     width = 8,height = 8,units = "in",bg = "grey",res = 350)
 ####beacuse venn digaram involved random
@@ -1031,9 +794,9 @@ dev.off()
 
 ####-------5.blastoid analysis------------
 
-####-------5.1 load data-------
+####-------5.1 load data and correct bath-------
 
-
+####-------5.1.1 load data------------
 ####EPS blastoid
 tmp.dir <- "data/blastoid/GSE135701/EPS_blastoid/"
 tmp.mat <- Read10X(data.dir = tmp.dir)
@@ -1045,7 +808,6 @@ tmp.mat.1 <- tmp.mat[,tmp.cell.id]
 seu <- CreateSeuratObject(tmp.mat.1,min.features = 2000,min.cells = 0,project = "EPS_blastoid")
 colnames(seu@meta.data)
 VlnPlot(seu,features = c("nCount_RNA","nFeature_RNA"))
-
 seu.1 <- seu
 
 ####blastocyst
@@ -1060,15 +822,13 @@ seu <- CreateSeuratObject(tmp.mat.1,min.features = 2000,min.cells = 0,project = 
 colnames(seu@meta.data)
 seu.2 <- seu
 
-###merge
+###-----5.1.2 direct merge----------
 seu <- merge(seu.1,seu.2)
-
-
-
 seu <- NormalizeData(seu)
 seu <- ScaleData(seu)
 seu <- FindVariableFeatures(seu,selection.method = "vst",nfeatures = 3000)
 seu <- RunPCA(seu,features = VariableFeatures(seu))
+#### The following code doesn't work small samples
 # tmp.mat <- as.matrix(seu@assays$RNA@data)
 # tmp.genes <- VariableFeatures(seu)
 # seu.dist <- 1- cor(tmp.mat[tmp.genes,],method = "pearson")
@@ -1081,14 +841,12 @@ seu <- RunTSNE(seu,dims = 1:20,seed.use = 42)
 seu <- RunUMAP(seu,dims = 1:20,umap.method = "umap-learn")
 seu <- FindNeighbors(seu,dims = c(1:20))
 seu <- FindClusters(seu,resolution = 0.2)
-
 UMAPPlot(seu,group.by="orig.ident")
-
 colnames(seu@meta.data)
 FeaturePlot(seu,features = c("Ascl2"))
 
 
-
+####------5.1.3 batch effect correct-------------
 tmp.list <- list(seu.1,seu.2)
 names(tmp.list) <- c("EPS_blastoid","blastocyst")
 tmp.list <- lapply(names(tmp.list),FUN = function(x){
@@ -1118,6 +876,7 @@ seu.integrated <- FindClusters(seu.integrated,resolution = 0.2)
 
 ####-------5.2 assign clusters-------------
 
+####-------5.2.1 assign markers----------
 TE.markers <- c("Cdx2","Krt8","Krt18","Ascl2","Tacstd2")
 ICM.markers <- c("Pou5f1","Nanog","Sox2","Esrrb","Sox15")
 PE.markers <- c("Gata4","Gata6","Sox17","Pdgfra","Col4a1")
@@ -1145,8 +904,6 @@ ggsave(plot = p,filename = myFileName(prefix = "res/fig/Fig3_EPS_blastoid_marker
                              suffix = ".png"),
        dpi = 350,width = 18,height = 8)
 
-UMAPPlot(seu.integrated,label=T)
-?UMAPPlot
 seu.integrated <- RenameIdents(seu.integrated,
                                "0"="intermediate",
                                "1"="PE",
@@ -1160,8 +917,6 @@ levels(seu.integrated) <- c("EPI","TE","PE","intermediate")
 p1 <- UMAPPlot(seu.integrated) + 
   scale_color_manual(values = c("#e90b8e","#3b53a5","#6ebe45","grey"))
 p1
-
-
 p <- wrap_plots(c(list(p1),p2),nrow = 3) & 
   theme_cowplot(font_size = 24) &
   NoAxes()
@@ -1169,7 +924,6 @@ p
 ggsave(plot = p,filename = myFileName(prefix = "res/fig/Fig3_EPS_blastoid_markers",
                                       suffix = ".png"),
        dpi = 350,width = 18,height = 8)
-
 
 p3 <- UMAPPlot(seu.integrated,pt.size=1.5,
                split.by="orig.ident") +
@@ -1180,11 +934,11 @@ p3
 ggsave(filename = myFileName(prefix = "res/fig/Fig3_EPS_split_plot",
                              suffix = ".png"),
        width = 8,height = 4,dpi = 350)
-
 saveRDS(seu.integrated,file = myFileName(prefix = "res/R/EPS_blastoid",suffix = ".rds"))
 
 
-#####----show markers-----
+####-------------5.2.2 show markers-------------------
+seu.integrated <- readRDS(file = "res/R/EPS_blastoid_20211017.rds")
 TE.markers <- c("Cdx2","Krt8","Krt18","Ascl2","Tacstd2")
 ICM.markers <- c("Pou5f1","Nanog","Sox2","Esrrb","Sox15")
 PE.markers <- c("Gata4","Gata6","Sox17","Pdgfra","Col4a1")
@@ -1193,12 +947,21 @@ tmp.markers <- c("Gapdh","Ppia",
                  ICM.markers,
                  PE.markers)
 tmp.seu <- seu.integrated
+levels(tmp.seu) <- c("TE","EPI","PE","intermediate")
+tmp.seu$cell.type <- Idents(tmp.seu)
 DefaultAssay(tmp.seu) <- "RNA"
-####myscAreaPlot(tmp.seu = tmp.seu,features = "Sox2",tmp.color = divergentcolor(length(levels(tmp.seu))))
-levels(tmp.seu) <- c("TE","EPI","PE")
+head(tmp.seu[[]])
+p1 <- DimPlot(tmp.seu,group.by = "orig.ident")
+p2 <- DimPlot(tmp.seu,group.by = "cell.type")
+p1 | p2
+UMAPPlot(tmp.seu)
 myscAreaPlot(tmp.seu = tmp.seu,
              features = tmp.markers,
              tmp.color = divergentcolor(length(levels(tmp.seu))))
+
+
+
+
 
 ###------------5.3 IS -----------
 
@@ -1352,13 +1115,11 @@ cell_id <- sample(x = colnames(tmp.seu),size = ncol(seu.list$blastocyst))
 tmp.seu <- subset(tmp.seu,cells=cell_id)
 UMAPPlot(tmp.seu)
 UMAPPlot(seu.list$blastocyst)
-tmp.seu 
 
 tmp.res.list <- myISwithPvalue(seu = tmp.seu,
                                Lgenelist = Lgenelist,
                                Rgenelist = Rgenelist,
                                calc.p=T)
-
 tmp.res.list.EPS_blastoid <- tmp.res.list
 
 tmp.res.list <- myISwithPvalue(seu = seu.list$blastocyst,
@@ -1366,6 +1127,10 @@ tmp.res.list <- myISwithPvalue(seu = seu.list$blastocyst,
                                Rgenelist = Rgenelist,
                                calc.p=T)
 tmp.res.list.blastocyst <- tmp.res.list
+
+
+saveRDS(object = tmp.res.list.blastocyst, file = "res/R/GSE135701_blastocyst.rds")
+saveRDS(object = tmp.res.list.EPS_blastoid, file = "res/R/GSE135701_EPS_blastoid.rds")
 
 
 ####------5.3.3 buble plot--------
@@ -1435,23 +1200,32 @@ tmp.IS.p.buble.plot <- function(tmp.res.list,title=NULL){
            color = guide_colorbar(order = 2))+
     theme(panel.grid.minor = element_blank(),
           panel.grid.major = element_blank(),
-          axis.text=element_text(size=24, colour = "black"),
+          axis.text = element_text(size = 24, colour = "black"),
           axis.text.x = element_text(angle = 90, hjust = 1),
-          axis.title=element_blank(),plot.title = element_text(hjust = 0.5),
-          panel.border = element_rect(size = 0.7, linetype = "solid", colour = "black"))
+          axis.text.y = element_text(face = "italic"),
+          axis.title=element_blank(),
+          plot.title = element_text(hjust = 0.5),
+          panel.border = element_rect(size = 0.7, 
+                                      linetype = "solid", 
+                                      colour = "black"))
   
   return(p)
   
 }
 
-
-
-
-p1 <- tmp.IS.p.buble.plot(tmp.res.list = tmp.res.list.blastocyst,title = "blastocyst")
-ggsave(filename = myFileName(prefix = "res/fig/fig3_scInt_IS_blastocyst_buble",suffix = ".png"),
+###plot dot
+tmp.res.list.blastocyst <- readRDS(file = "res/R/GSE135701_blastocyst.rds")
+p1 <- tmp.IS.p.buble.plot(tmp.res.list = tmp.res.list.blastocyst,
+                          title = "blastocyst")
+p1
+ggsave(filename = myFileName(prefix = "res/fig/fig3_scInt_IS_blastocyst_buble",
+                             suffix = ".png"),
        width = 8,height = 16,dpi = 350)
 
-p2 <- tmp.IS.p.buble.plot(tmp.res.list = tmp.res.list.EPS_blastoid,title = "EPS blastoid")
+tmp.res.list.EPS_blastoid <- readRDS(file = "res/R/GSE135701_EPS_blastoid.rds")
+p2 <- tmp.IS.p.buble.plot(tmp.res.list = tmp.res.list.EPS_blastoid,
+                          title = "EPS blastoid")
+p2
 ggsave(filename = myFileName(prefix = "res/fig/fig3_scInt_IS_EP_buble",suffix = ".png"),
        width = 8,height = 16,dpi = 350)
 
@@ -1497,8 +1271,8 @@ tmp.LR.pairs <- c(tmp.LR.pairs.1,tmp.LR.pairs.2)
 
 #tmp.LR.pairs <- c(tmp.LR.pairs,"Bmp4_Bmpr2")
 
-tmp.LR.pairs.1
-tmp.LR.pairs.2
+# tmp.LR.pairs.1
+# tmp.LR.pairs.2
 
 plot.data <- data.plot %>%
   filter(LRpairs %in% tmp.LR.pairs)
@@ -1611,238 +1385,479 @@ tmp.plot[tmp.plot < -1] <- -1
 
 png(filename = myFileName(prefix = "res/fig/fig3_scInt_diff",suffix = ".png"),
     width = 8,height = 16,units = "in",res = 350)
-ComplexHeatmap::Heatmap(matrix = tmp.plot,
-                        col = rdbu(100),
-                        cluster_columns = F,
-                        cluster_rows = F,
-                        row_names_gp = gpar(fontsize=20,fontface="italic"),
-                        column_names_gp = gpar(fontsize=20),
-                        rect_gp = gpar(col = "black"),
-                        heatmap_legend_param = list(title = expression(Delta(IS)),
-                                                    title_gp = gpar(col = "black", fontsize = 20),
-                                                    labels_gp = gpar(col = "black",fontsize = 20)),
-                        show_column_names = T,
-                        show_row_names = T)
+ComplexHeatmap::pheatmap(tmp.plot,
+                         color = rdbu(100),
+                         cluster_cols = F,
+                         cluster_rows = F,
+                         show_rownames = T,
+                         fontsize = 20,
+                         heatmap_legend_param = list(title = expression(Delta(IS)),
+                                                     title_gp = gpar(col = "black", fontsize = 20),
+                                                     labels_gp = gpar(col = "black",fontface="italic",fontsize = 20)),
+                         show_colnames = T)
 dev.off()
-?Heatmap
-?expression
-
-####----5.3.6 circos plot--------
 
 
-tmp.res.list <- tmp.res.list.blastocyst
+#### The folllowing code wiil be removed in the near future
+# ####----5.3.6 circos plot--------
+# 
+# 
+# tmp.res.list <- tmp.res.list.blastocyst
+# 
+# tmp.circos.plot <- function(tmp.res.list){
+#   data.plot <- as.data.frame(tmp.res.list$IS)
+#   data.plot <- data.plot %>%
+#     rownames_to_column("LRpairs") %>%
+#     gather(key = "cell_pairs",value="IS",-LRpairs)
+#   
+#   data.plot.p <- as.data.frame(tmp.res.list$IS.p)
+#   data.plot.p <- data.plot.p %>%
+#     rownames_to_column("LRpairs") %>%
+#     gather(key = "cell_pairs",value="IS.p",-LRpairs)
+#   data.plot$IS.p <- data.plot.p$IS.p
+#   
+#   data.plot$Ligand <- unlist(lapply(strsplit(data.plot$LRpairs,split = "_"),FUN = function(x) x[1])) 
+#   data.plot$Receptor <- unlist(lapply(strsplit(data.plot$LRpairs,split = "_"),FUN = function(x) x[2])) 
+#   data.plot$cell_L <- unlist(lapply(strsplit(data.plot$cell_pairs,split = "_"),FUN = function(x) x[1])) 
+#   data.plot$cell_R <- unlist(lapply(strsplit(data.plot$cell_pairs,split = "_"),FUN = function(x) x[2]))
+#   
+#   
+#   data.plot.gene <- data.frame(cell=c(data.plot$cell_L,data.plot.circos$cell_R),
+#                                gene=c(data.plot$Ligand,data.plot.circos$Receptor),
+#                                lr=c(rep("ligand",length(data.plot$Ligand)),
+#                                     rep("receptor",length(data.plot$Receptor))),
+#                                stringsAsFactors = F) %>%
+#     unique()
+#   data.plot.gene$gene_id <- paste0("gene",1:nrow(data.plot.gene))
+#   data.plot.gene$map_id <- paste0(data.plot.gene$cell,"_",data.plot.gene$gene,"_",data.plot.gene$lr)
+#   
+#   
+#   
+#   library(circlize)
+#   df <- data.plot.gene %>%
+#     arrange(cell)
+#   
+#   tmp.cell.type <- unique(df$cell)
+#   tmp.cell.colors <- c("#e90b8e","#3b53a5","#6ebe45","grey")
+#   names(tmp.cell.colors) <- c("EPI","TE","PE","intermediate")
+#   
+#   circos.clear()
+#   circos.par(canvas.xlim =c(-1.1,1.1),
+#              canvas.ylim = c(-1.1,1.1),
+#              gap.degree=0.001,
+#              cell.padding = c(0.02, 0, 0.02, 0))
+#   fa = df$gene_id
+#   fa = factor(fa,levels = fa)
+#   circos.initialize(factors = fa, xlim = c(0,1))
+#   
+#   circos.trackPlotRegion(
+#     
+#     ylim = c(0, 1), track.height = 0.15, bg.border = NA,
+#     
+#     panel.fun = function(x, y) {
+#       
+#       sector.index = get.cell.meta.data("sector.index")
+#       
+#       xlim = get.cell.meta.data("xlim")
+#       
+#       ylim = get.cell.meta.data("ylim")
+#       
+#     } )
+#   
+#   
+#   
+#   lapply(1:length(tmp.cell.type),FUN = function(ii){
+#     x <- tmp.cell.type[ii]
+#     tmp.gene.id <- df %>%
+#       dplyr::filter(cell==x) %>%
+#       pull(gene_id)
+#     highlight.sector(tmp.gene.id, 
+#                      track.index = 1,
+#                      text = x, 
+#                      niceFacing = F, 
+#                      font = 2, 
+#                      col = tmp.cell.colors[x])
+#   })
+#   
+#   circos.trackPlotRegion(
+#     
+#     ylim = c(0, 1), track.height = 0.08, bg.border = NA,
+#     
+#     panel.fun = function(x, y) {
+#       
+#       sector.index = get.cell.meta.data("sector.index")
+#       
+#       xlim = get.cell.meta.data("xlim")
+#       
+#       ylim = get.cell.meta.data("ylim")
+#       
+#     } )
+#   
+#   
+#   
+#   tmp.cat <- unique(df$lr)
+#   tmp.cat.color <- c('#ffc000',"#00af50")
+#   names(tmp.cat.color) <- c("ligand","receptor")
+#   lapply(1:length(tmp.cat),FUN = function(ii){
+#     x <- tmp.cat[ii]
+#     tmp.gene.id <- df %>%
+#       dplyr::filter(lr==x) %>%
+#       pull(gene_id)
+#     highlight.sector(tmp.gene.id, 
+#                      track.index = 2,
+#                      text = x, niceFacing = F,
+#                      col = tmp.cat.color[x],
+#                      text.col = 'black')
+#   })
+#   
+#   
+#   lrid <- data.plot %>%
+#     dplyr::filter(IS.p < 0.01) %>%
+#     dplyr::mutate(xx = paste0(cell_L,"_",Ligand,"_","ligand"),
+#                   yy = paste0(cell_R,"_",Receptor,"_","receptor")) %>%
+#     dplyr::mutate(xx=plyr::mapvalues(xx,
+#                                      from = data.plot.gene$map_id,
+#                                      to = data.plot.gene$gene_id),
+#                   yy=plyr::mapvalues(yy,
+#                                      from = data.plot.gene$map_id,
+#                                      to = data.plot.gene$gene_id))
+#   
+#   
+#   
+#   for(i in 1:nrow(lrid)){
+#     circos.link(sector.index1 = lrid$xx[i], 
+#                 point1 = 0, 
+#                 sector.index2 = lrid$yy[i], 
+#                 point2 = 0 ,
+#                 directional = 0,
+#                 h=0.5, 
+#                 lwd=0.1, 
+#                 col="grey",
+#                 lty=1)
+#   }
+#   
+# }
+# 
+# tmp.circos.plot(tmp.res.list = tmp.res.list.blastocyst)
+# 
+# p <- recordPlot()
+# 
+# png(filename = myFileName(prefix = "res/fig/fig3_circos_blastocyst",suffix = ".png"),width = 8,height = 8,units = "in",res = 350)
+# p
+# title("blastocyst")
+# dev.off()
+# 
+# 
+# tmp.circos.plot(tmp.res.list = tmp.res.list.EPS_blastoid)
+# p <- recordPlot()
+# png(filename = myFileName(prefix = "res/fig/fig3_circos_EPS_blastoid",suffix = ".png"),width = 8,height = 8,units = "in",res = 350)
+# p
+# title("EPS_blastoid")
+# dev.off()
 
-tmp.circos.plot <- function(tmp.res.list){
-  data.plot <- as.data.frame(tmp.res.list$IS)
-  data.plot <- data.plot %>%
-    rownames_to_column("LRpairs") %>%
-    gather(key = "cell_pairs",value="IS",-LRpairs)
-  
-  data.plot.p <- as.data.frame(tmp.res.list$IS.p)
-  data.plot.p <- data.plot.p %>%
-    rownames_to_column("LRpairs") %>%
-    gather(key = "cell_pairs",value="IS.p",-LRpairs)
-  data.plot$IS.p <- data.plot.p$IS.p
-  
-  data.plot$Ligand <- unlist(lapply(strsplit(data.plot$LRpairs,split = "_"),FUN = function(x) x[1])) 
-  data.plot$Receptor <- unlist(lapply(strsplit(data.plot$LRpairs,split = "_"),FUN = function(x) x[2])) 
-  data.plot$cell_L <- unlist(lapply(strsplit(data.plot$cell_pairs,split = "_"),FUN = function(x) x[1])) 
-  data.plot$cell_R <- unlist(lapply(strsplit(data.plot$cell_pairs,split = "_"),FUN = function(x) x[2]))
-  
-  
-  data.plot.gene <- data.frame(cell=c(data.plot$cell_L,data.plot.circos$cell_R),
-                               gene=c(data.plot$Ligand,data.plot.circos$Receptor),
-                               lr=c(rep("ligand",length(data.plot$Ligand)),
-                                    rep("receptor",length(data.plot$Receptor))),
-                               stringsAsFactors = F) %>%
-    unique()
-  data.plot.gene$gene_id <- paste0("gene",1:nrow(data.plot.gene))
-  data.plot.gene$map_id <- paste0(data.plot.gene$cell,"_",data.plot.gene$gene,"_",data.plot.gene$lr)
-  
-  
-  
-  library(circlize)
-  df <- data.plot.gene %>%
-    arrange(cell)
-  
-  tmp.cell.type <- unique(df$cell)
-  tmp.cell.colors <- c("#e90b8e","#3b53a5","#6ebe45","grey")
-  names(tmp.cell.colors) <- c("EPI","TE","PE","intermediate")
-  
-  circos.clear()
-  circos.par(canvas.xlim =c(-1.1,1.1),
-             canvas.ylim = c(-1.1,1.1),
-             gap.degree=0.001,
-             cell.padding = c(0.02, 0, 0.02, 0))
-  fa = df$gene_id
-  fa = factor(fa,levels = fa)
-  circos.initialize(factors = fa, xlim = c(0,1))
-  
-  circos.trackPlotRegion(
-    
-    ylim = c(0, 1), track.height = 0.15, bg.border = NA,
-    
-    panel.fun = function(x, y) {
-      
-      sector.index = get.cell.meta.data("sector.index")
-      
-      xlim = get.cell.meta.data("xlim")
-      
-      ylim = get.cell.meta.data("ylim")
-      
-    } )
-  
-  
-  
-  lapply(1:length(tmp.cell.type),FUN = function(ii){
-    x <- tmp.cell.type[ii]
-    tmp.gene.id <- df %>%
-      dplyr::filter(cell==x) %>%
-      pull(gene_id)
-    highlight.sector(tmp.gene.id, 
-                     track.index = 1,
-                     text = x, 
-                     niceFacing = F, 
-                     font = 2, 
-                     col = tmp.cell.colors[x])
-  })
-  
-  circos.trackPlotRegion(
-    
-    ylim = c(0, 1), track.height = 0.08, bg.border = NA,
-    
-    panel.fun = function(x, y) {
-      
-      sector.index = get.cell.meta.data("sector.index")
-      
-      xlim = get.cell.meta.data("xlim")
-      
-      ylim = get.cell.meta.data("ylim")
-      
-    } )
-  
-  
-  
-  tmp.cat <- unique(df$lr)
-  tmp.cat.color <- c('#ffc000',"#00af50")
-  names(tmp.cat.color) <- c("ligand","receptor")
-  lapply(1:length(tmp.cat),FUN = function(ii){
-    x <- tmp.cat[ii]
-    tmp.gene.id <- df %>%
-      dplyr::filter(lr==x) %>%
-      pull(gene_id)
-    highlight.sector(tmp.gene.id, 
-                     track.index = 2,
-                     text = x, niceFacing = F,
-                     col = tmp.cat.color[x],
-                     text.col = 'black')
-  })
-  
-  
-  lrid <- data.plot %>%
-    dplyr::filter(IS.p < 0.01) %>%
-    dplyr::mutate(xx = paste0(cell_L,"_",Ligand,"_","ligand"),
-                  yy = paste0(cell_R,"_",Receptor,"_","receptor")) %>%
-    dplyr::mutate(xx=plyr::mapvalues(xx,
-                                     from = data.plot.gene$map_id,
-                                     to = data.plot.gene$gene_id),
-                  yy=plyr::mapvalues(yy,
-                                     from = data.plot.gene$map_id,
-                                     to = data.plot.gene$gene_id))
-  
-  
-  
-  for(i in 1:nrow(lrid)){
-    circos.link(sector.index1 = lrid$xx[i], 
-                point1 = 0, 
-                sector.index2 = lrid$yy[i], 
-                point2 = 0 ,
-                directional = 0,
-                h=0.5, 
-                lwd=0.1, 
-                col="grey",
-                lty=1)
-  }
-  
-}
 
-tmp.circos.plot(tmp.res.list = tmp.res.list.blastocyst)
+####The following code is important
+####------5.3.7 eLR and regulon-------------
 
-p <- recordPlot()
+####------5.3.7.1 load data--------
 
-png(filename = myFileName(prefix = "res/fig/fig3_circos_blastocyst",suffix = ".png"),width = 8,height = 8,units = "in",res = 350)
+####load seurat
+seu.integrated <- readRDS(file = "res/R/EPS_blastoid_20211017.rds")
+
+
+####-----6.Calculate cellcall--------
+
+####-----6.1 read rds-----------
+
+####load seurat
+seu.integrated <- readRDS(file = "res/R/EPS_blastoid_20211017.rds")
+tmp.seu <- seu.integrated
+levels(tmp.seu) <- c("TE","EPI","PE","intermediate")
+tmp.seu$cell.type <- Idents(tmp.seu)
+DefaultAssay(tmp.seu) <- "RNA"
+
+####get count data
+data.mat <- GetAssayData(tmp.seu,
+                         slot = "counts",
+                         assay = "RNA")
+data.meta <- tmp.seu[[]] %>%
+  rownames_to_column("cell.id") %>%
+  group_by(cell.type) %>%
+  mutate(tmp.id = row_number()) %>%
+  arrange(cell.type) %>%
+  ungroup() %>%
+  mutate(tmp.id = paste0(tmp.id,"_",cell.type))
+
+colnames(data.mat) <- plyr::mapvalues(x = colnames(data.mat),
+                                      from = data.meta$cell.id,
+                                      to = data.meta$tmp.id)
+
+####---------6.2 perform cellcall analysis-----------
+####Create CellCall object
+mt <- CreateNichConObject(data = as.data.frame(data.mat), 
+                          min.feature = 0,
+                          names.field = 2,
+                          names.delim = "_",
+                          source = "UMI",
+                          scale.factor = 10^6,
+                          Org = "Mus musculus",
+                          project = "Microenvironment")
+#### Infer the cell-cell communication score
+mt <- TransCommuProfile(object = mt,
+                        pValueCor = 0.05,
+                        CorValue = 0.1,
+                        topTargetCor=1,
+                        p.adjust = 0.05,
+                        use.type="median",
+                        probs = 0.9,
+                        method="weighted",
+                        IS_core = TRUE,
+                        Org = 'Mus musculus')
+#### Pathway activity analysis
+n <- mt@data$expr_l_r_log2_scale
+pathway.hyper.list <- lapply(colnames(n), function(i){
+  print(i)
+  tmp <- getHyperPathway(data = n, 
+                         object = mt, 
+                         cella_cellb = i, 
+                         Org="Mus musculus")
+  return(tmp)
+})
+
+myPub.df <- getForBubble(pathway.hyper.list, cella_cellb=colnames(n))
+p <- plotBubble(myPub.df)+
+  theme(axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18))
 p
-title("blastocyst")
+ggsave(plot = p,
+       filename = myFileName(prefix = "res/fig/cellcall_Pathway_Bublleplot",
+                             suffix = ".png"),
+       width = 12,height = 8,dpi = 350)
+
+####------6.3 visualization-------
+
+
+####------6.3.1 Circos----------
+cell_color <- data.frame(color = divergentcolor(length(levels(tmp.seu))), 
+                         stringsAsFactors = FALSE)
+rownames(cell_color) <- levels(tmp.seu)
+
+
+
+png(filename = myFileName(prefix = "res/fig/cellcal_LR_circos_plot",suffix = ".png"),
+    width = 8,height = 6,units = "in",res = 350)
+ViewInterCircos(object = mt, 
+                font = 2, 
+                cellColor = cell_color, 
+                lrColor = c("#F16B6F", "#84B1ED"),
+                arr.type = "big.arrow",
+                arr.length = 0.04,
+                trackhight1 = 0.05, 
+                slot="expr_l_r_log2_scale",
+                linkcolor.from.sender = TRUE,
+                linkcolor = NULL, 
+                gap.degree = 2,
+                order.vector = levels(tmp.seu),
+                trackhight2 = 0.032, 
+                track.margin2 = c(0.01,0.12), 
+                DIY = FALSE)
 dev.off()
 
+#####--------6.3.2 pheatmap------------
+### present detailed communication scores by pheatmap
+dat <- mt@data[["expr_l_r_log2_scale"]]
+ph <- pheatmap::pheatmap(dat, 
+                   color = rdbu(100),
+                   show_rownames = T, 
+                   show_colnames = T, 
+                   cluster_rows = T, 
+                   cluster_cols = F, 
+                   fontsize = 20,
+                   cellwidth = 20,
+                   cellheight = 15,
+                   angle_col = "45", 
+                   main = "score")
+tmp.size <- get_pheatmap_dims(ph)
+tmp.size
 
-tmp.circos.plot(tmp.res.list = tmp.res.list.EPS_blastoid)
-p <- recordPlot()
-png(filename = myFileName(prefix = "res/fig/fig3_circos_EPS_blastoid",suffix = ".png"),width = 8,height = 8,units = "in",res = 350)
-p
-title("EPS_blastoid")
+png(filename = myFileName(prefix = "res/fig/cellcall_pheatmap",suffix = ".png"),
+    width = tmp.size$width+2.5,
+    height = tmp.size$height+0.5,
+    units = "in",
+    res = 350)
+ph
 dev.off()
 
+####-------6.3.3 sankey plot ------------
+levels(tmp.seu)
+mt <- LR2TF(object = mt, 
+            sender_cell="intermediate", 
+            recevier_cell="TE",
+            slot="expr_l_r_log2_scale", 
+            org="Mus musculus")
+head(mt@reductions$sankey)
+
+library(magrittr)
+library(dplyr)
+tmp <- mt@reductions$sankey
+tmp1 <- dplyr::filter(tmp, weight1>0) 
+## filter triple relation with weight1 (LR score)
+tmp.df <- trans2tripleScore(tmp1)  
+## transform weight1 and weight2 to one value (weight)
+head(tmp.df)
+## set the color of node in sankey graph
+mycol.vector = c('#5d62b5','#29c3be','#f2726f','#62b58f','#bc95df', '#67cdf2', '#ffc533', '#5d62b5', '#29c3be')  
+elments.num <-  tmp.df %>% unlist %>% unique %>% length()
+mycol.vector.list <- rep(mycol.vector, times=ceiling(elments.num/length(mycol.vector)))
+sankey_graph(df = tmp.df, axes=1:3, mycol = mycol.vector.list[1:elments.num], nudge_x = NULL, font.size = 4, boder.col="white", isGrandSon = F)
+ggsave(filename = myFileName(prefix = "res/fig/cellcall_sankey_plot",
+                             suffix = ".png"),
+       width = 8,height = 8,dpi = 350)
+
+####-------6.3.4 TF enrichment plot--------------
+
+mt@data$gsea.list$intermediate@geneSets
+names(mt@data$gsea.list$intermediate@geneSets)
+
+getGSEAplot(gsea.list=mt@data$gsea.list, 
+            geneSetID=c("Smad1", "Sox9", "Lef1"), 
+            myCelltype="intermediate",
+            fc.list=mt@data$fc.list,  
+            selectedGeneID = mt@data$gsea.list$intermediate@geneSets$Smad1[1:10],
+            mycol = NULL)
+
+## gsea object
+egmt <- mt@data$gsea.list$intermediate
+
+## filter TF
+egmt.df <- data.frame(egmt)
+head(egmt.df[,1:6])
+flag.index <- which(egmt.df$p.adjust < 0.05)
+ridgeplot.DIY(x=egmt, 
+              fill="p.adjust", 
+              showCategory=flag.index, 
+              core_enrichment = T,
+              orderBy = "NES", 
+              decreasing = FALSE)
+ggsave(filename = myFileName(prefix = "res/fig/cellcall_show_Rigeplot",
+                             suffix = ".png"),
+       width = 8,height = 8,dpi = 350)
+
+####--------7. CellChat ----------
+
+#### using CellChat compare the two dataset
+
+####--------7.1 load data----------
+seu.integrated <- readRDS(file = "res/R/EPS_blastoid_20211017.rds")
+tmp.seu <- seu.integrated
+levels(tmp.seu) <- c("TE","EPI","PE","intermediate")
+tmp.seu$cell.type <- Idents(tmp.seu)
+DefaultAssay(tmp.seu) <- "RNA"
+
+####-------7.2 compared the two data set----------
+table(tmp.seu$orig.ident)
+tmp.seu.list <- SplitObject(tmp.seu, split.by = "orig.ident")
 
 
-####-------6. validate on ZGA gene---------------
+
+
+####-------xxx. validate on ZGA gene---------------
 ####20210601
-
 #### load expression data
-
 tmp.df.1 <- read.delim(file = "data/GSE71434_FPKM_inhibition.txt",sep = "\t",stringsAsFactors = F)
 tmp.df.2 <- read.delim(file = "data/GSE71434_FPKM_stage.txt",sep = "\t",stringsAsFactors = F)
 tmp.df <- merge(tmp.df.1,tmp.df.2,by="Gene")
-
+zga_gene_zhangyi <- read_delim(file = "database/other_ZGA/Nfya_KD_zhangyi.txt",delim = "\t") %>%
+  pull(gene)
+#zga_gene_zhangyi <- intersect(zga_gene_zhangyi,mm9.gene.list)
 
 #### load eLR data
-tmp.cutoff <- 0.1
-LRpairs.df <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
-LRpairs.df <- LRpairs.df %>%
-  dplyr::filter(abs(PCC) >= tmp.cutoff)
+LRpairs.df <- readRDS(file = "res/R/eLR_row_annotaion_df_2022032700.rds") %>%
+  rownames_to_column("LRpairs") %>%
+  mutate(Lgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ii[1]}))) %>%
+  mutate(Rgene=unlist(lapply(str_split(LRpairs,pattern = "-"),FUN = function(ii){ii[2]})))
 
-L.gene.list <- LRpairs.df$Lgene
-R.gene.list <- LRpairs.df$Rgene
+tmp.id.1 <- which(LRpairs.df$Lgene %in% zga_gene_zhangyi)
+LRpairs.df$Lgene[tmp.id.1]
+tmp.id.2 <- which(LRpairs.df$Rgene %in% zga_gene_zhangyi)
+tmp.id <- unique(c(tmp.id.1,tmp.id.2))
+tmp.LR.df <- LRpairs.df[tmp.id,]
 
+
+#### Calculate ZGA
 tmp.df <- tmp.df[!duplicated(tmp.df$Gene),]
 data.plot <-  tmp.df %>% 
   dplyr::select(Gene,
                 X2cell_early,
                 X2cell_late,
-                X2cell_alpha_amanitin) 
+                X2cell_alpha_amanitin)
 rownames(data.plot) <- data.plot$Gene
 data.plot <- data.plot[,-1]
 colnames(data.plot) <- c("early_2cell","late_2cell","2cell_alpha_amanitin")
 #data.plot <- log10(data.plot+1)
 
-data.plot.L <- data.plot[LRpairs.df$Lgene,]
-data.plot.R <- data.plot[LRpairs.df$Rgene,]
+data.plot.L <- data.plot[tmp.LR.df$Lgene,]
+data.plot.R <- data.plot[tmp.LR.df$Rgene,]
+data.plot.IS <- sqrt(data.plot.L * data.plot.R)
+rownames(data.plot.IS) <- paste0(tmp.LR.df$Lgene,"-",tmp.LR.df$Rgene)
+data.plot.IS <- pheatmap:::scale_rows(data.plot.IS)
+data.plot.IS[is.na(data.plot.IS)] <- 0
 
-data.plot.IS <- data.plot.L * data.plot.R
-rownames(data.plot.IS) <- paste0(LRpairs.df$Lgene,"_",LRpairs.df$Rgene)
+tmp.data.plot <- data.plot.IS
 
-colnames(data.plot.IS)
-data.plot.IS <- log10(data.plot.IS+1)
 
-num_clusters = 6
-ph <- pheatmap::pheatmap(data.plot.IS,
-               scale = "none",
-               color = rdbu(100),
-               show_rownames = F,
-               cutree_rows = num_clusters,
-               silent = T)
-annotation_row <- data.frame(Cluster = factor(cutree(ph$tree_row,num_clusters)))
+ph <- pheatmap::pheatmap(tmp.data.plot,
+                         scale = "none",
+                         color = rdbu(100),
+                         show_rownames = T,
+                         show_colnames = T,
+                         cellwidth = 16,
+                         cellheight = 16,
+                         fontsize = 16,
+                         angle_col = "45")
 
-png(filename = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_pheatmap",suffix = ".png"),
-    width = 6,height = 12,units = "in",res = 350)
-pheatmap::pheatmap(data.plot.IS,
-         scale = "none",
-         color = rdbu(100),
-         show_rownames = F,
-         cutree_rows = num_clusters,
-         angle_col = "45",
-         fontsize = 28,
-         annotation_row = annotation_row)
+get_plot_dims <- function(heat_map){
+  plot_height <- sum(sapply(heat_map$gtable$heights, grid::convertHeight, "in"))
+  plot_width  <- sum(sapply(heat_map$gtable$widths, grid::convertWidth, "in"))
+  return(list(height = plot_height, width = plot_width))
+}
+tmp.size <- get_plot_dims(ph)
+
+
+
+pdf(file = myFileName(prefix = "res/fig/fig3F_ZGA_inhibit_zoomout",suffix = ".pdf"),
+    width = tmp.size$width+2.5,
+    height = tmp.size$height+0.5)
+ComplexHeatmap::Heatmap(matrix = tmp.data.plot,
+                        col = rdbu(100),
+                        row_names_gp = gpar(fontsize=20,col=ifelse(rownames(tmp.data.plot) %in% c("Fgf4-Fgfr1","Fgf4-Fgfr2"),"red","black"),
+                                            fontface="italic"),
+                        rect_gp = gpar(col = "black"),
+                        column_names_gp = gpar(fontsize=20),
+                        column_names_rot = 45,
+                        column_names_centered = F,
+                        heatmap_legend_param = list(title="zscore",
+                                                    title_gp=gpar(fontsize=20,fontface="bold"),
+                                                    labels_gp=gpar(fontsize=16,fontface="bold")))
+dev.off()
+
+
+png(file = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_zoomout",suffix = ".png"),
+    width = tmp.size$width+2,
+    height = tmp.size$height+2,
+    units = "in",res = 350)
+ComplexHeatmap::Heatmap(matrix = tmp.data.plot,
+                        col = rdbu(100),
+                        row_names_gp = gpar(fontsize=20,
+                                            col=ifelse(rownames(tmp.data.plot) %in% c("Fgf4-Fgfr1","Fgf4-Fgfr2"),"red","black"),
+                                            fontface="italic"),
+                        rect_gp = gpar(col = "black"),
+                        column_names_gp = gpar(fontsize=20),
+                        column_names_rot = 45,
+                        column_names_centered = F,
+                        heatmap_legend_param = list(title="zscore",
+                                                    title_gp=gpar(fontsize=20,fontface="bold"),
+                                                    labels_gp=gpar(fontsize=20)))
 dev.off()
 
 
@@ -1851,10 +1866,8 @@ png(filename = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_pheatmap_filter",su
 tmp.idx <- annotation_row %>%
   dplyr::filter(Cluster %in% c(4,6)) %>%
   rownames()
-num_clusters <- 4
-tmp.data.plot.ttt <- data.plot.IS[tmp.idx,]
-#tmp.data.plot.ttt[tmp.data.plot.ttt>2] <- 2
-ph <- pheatmap::pheatmap(tmp.data.plot.ttt,
+num_clusters <- 6
+ph <- pheatmap::pheatmap(data.plot.IS[tmp.idx,],
                scale = "none",
                color = rdbu(100),
                show_rownames = T,
@@ -1864,7 +1877,7 @@ ph <- pheatmap::pheatmap(tmp.data.plot.ttt,
                silent = T,
                angle_col = 45)
 annotation_row.1 <- data.frame(Cluster = factor(cutree(ph$tree_row,num_clusters)))
-ph <- pheatmap::pheatmap(tmp.data.plot.ttt,
+ph <- pheatmap::pheatmap(data.plot.IS[tmp.idx,],
                          scale = "none",
                          color = rdbu(100),
                          show_rownames = F,
@@ -1879,10 +1892,11 @@ dev.off()
 
 
 tmp.idx <- annotation_row.1 %>%
-  dplyr::filter(Cluster %in% c(2,3,4)) %>%
+  dplyr::filter(Cluster %in% c(2,3,6)) %>%
   rownames()
 
-png(filename = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_zoomout",suffix = ".png"),width = 3,height = 9,units = "in",res = 350)
+png(filename = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_zoomout",suffix = ".png"),
+    width = 3,height = 9,units = "in",res = 350)
 pheatmap::pheatmap(data.plot.IS[tmp.idx,],
          scale = "none",
          color = rdbu(100),
@@ -1905,22 +1919,6 @@ ComplexHeatmap::pheatmap(data.plot.IS[tmp.idx,],
 dev.off()
 
 
-ph <- pheatmap::pheatmap(data.plot.IS[tmp.idx,],
-                         scale = "none",
-                         color = rdbu(100),
-                         show_rownames = T,
-                         show_colnames = T,
-                         cellwidth = 16,
-                         cellheight = 16,
-                         fontsize = 16,
-                         angle_col = "45")
-
-get_plot_dims <- function(heat_map){
-  plot_height <- sum(sapply(heat_map$gtable$heights, grid::convertHeight, "in"))
-  plot_width  <- sum(sapply(heat_map$gtable$widths, grid::convertWidth, "in"))
-  return(list(height = plot_height, width = plot_width))
-}
-tmp.size <- get_plot_dims(ph)
 
 png(file = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_zoomout",suffix = ".png"),
     width = tmp.size$width+0.5,
@@ -1954,17 +1952,18 @@ ComplexHeatmap::pheatmap(data.plot.IS[tmp.idx,],
 dev.off()
 
 
+
 tmp.data.plot <- data.plot.IS[tmp.idx,]
 rownames(tmp.data.plot) <- gsub(rownames(tmp.data.plot),pattern = "_",replacement = "-")
 colnames(tmp.data.plot) <- c("early 2-cell","late 2-cell","2-cell alpha amanitin")
 
-tmp.data.plot[tmp.data.plot > 2] <- 2
-pdf(file = myFileName(prefix = "res/fig/fig3_ZGA_inhibit_zoomout",suffix = ".pdf"),
+tmp.data.plot[tmp.data.plot > 1] <- 1
+pdf(file = myFileName(prefix = "res/fig/fig3F_ZGA_inhibit_zoomout",suffix = ".pdf"),
     width = tmp.size$width+2.5,
     height = tmp.size$height+0.5)
 ComplexHeatmap::Heatmap(matrix = tmp.data.plot,
                         col = rdbu(100),
-                        row_names_gp = gpar(fontsize=20,col=divergentcolor(nrow(tmp.data.plot)),
+                        row_names_gp = gpar(fontsize=20,col=ifelse(rownames(tmp.data.plot) %in% c("Fgf4-Fgfr1","Fgf4-Fgfr2"),"red","black"),
                                             fontface="italic"),
                         rect_gp = gpar(col = "black"),
                         column_names_gp = gpar(fontsize=20),
@@ -1993,3 +1992,25 @@ ComplexHeatmap::Heatmap(matrix = tmp.data.plot,
                                                     title_gp=gpar(fontsize=20,fontface="bold"),
                                                     labels_gp=gpar(fontsize=20)))
 dev.off()
+
+# ####---------export data--------
+# tmp.df <- readRDS(file = "res/R/putative_eLR_correlation_20210129.Rds")
+# LRpairs <- tmp.df %>%
+#   dplyr::filter(abs(PCC) > 0.1)
+# write.table(LRpairs,file = "res/txt/Additional_file_2_eLR_PCC_value.txt",quote = F,sep = "\t",row.names = F)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -182,37 +182,6 @@ my_getLR <- function(tmp.L.exp = data.plot[Lgene.list,tmp.id],
 
 
 
-####define function
-myenrichGO_plot <- function(tmp.res.plot,
-                            p.adjust.cut=0.01,
-                            show_number=20,
-                            title="The Most Enriched GO Terms",
-                            fill.color="#8DA1CB",
-                            plot.ylab="BP",
-                            font.size = 12){
-  tmp.res.plot$logp.adjust <- -log10(tmp.res.plot$p.adjust)
-  tmp.res.plot <- tmp.res.plot%>%
-    dplyr::filter(p.adjust < p.adjust.cut) %>%
-    slice_max(order_by = logp.adjust,
-              n=show_number,
-              with_ties=F)
-  tmp.res.plot$Description <- factor(tmp.res.plot$Description,
-                                     levels = rev(tmp.res.plot$Description))
-  p <- ggplot() + 
-    geom_bar(data = tmp.res.plot, aes_string(x = "Description", 
-                                             y = "logp.adjust"),
-             stat = "identity",width=0.5,
-             fill=fill.color)+
-    coord_flip() +
-    ggtitle(title)+
-    xlab(plot.ylab)+
-    ylab("-log10(p.adjust)")+
-    theme_cowplot(font_size = font.size) +
-    theme(axis.ticks.y = element_blank(),
-          plot.title = element_text(hjust  = 0.5))
-  
-  return(p)
-}
 
 
 
@@ -324,7 +293,7 @@ myenrichr_GOplot <- function(df=tmp,
                            font.size = 12){
   data.plot <- df
   data.plot$logp.adjust <- -log10(data.plot$p.adjust)
-  data.plot$Term <- gsub(pattern = "^GO_",replacement = "",data.plot$ID)
+  data.plot$Term <- data.plot$Description
   data.plot <- data.plot %>%
     dplyr::filter(p.adjust < p.adjust.cut) %>%
     slice_max(order_by = logp.adjust,n=show_number,with_ties=F)
@@ -343,7 +312,7 @@ myenrichr_GOplot <- function(df=tmp,
     coord_flip() +
     ggtitle(title)+
     xlab(plot.ylab)+
-    ylab("-log10(p.adjust)")+
+    ylab(expression(-log[10](p.just)))+
     geom_text(data = data.term, 
               aes(x=y,y=x,label = label), 
               color = "black",
@@ -446,7 +415,7 @@ myBoxPlot <- function(data.plot,x,y,xlab,ylab,...){
 ### file generate
 
 myFileName <- function(prefix,suffix){
-  res <- paste0(prefix,"_",format(Sys.Date(),"%Y%m%d"),suffix)
+  res <- paste0(prefix,"_",format(Sys.time(),"%Y%m%d%H"),suffix)
   return(res)
 }
 
@@ -458,10 +427,6 @@ myCapitalized <- function(tmp.string){
 
 
 
-### default to save to jpg
-myggsave <- function(p,prefix,suffix,width=8,height=8,...){
-  ggsave(p,filename = myFileName(prefix = prefix,suffix = suffix),width = width,height = height,...)
-}
 
 
 myrunDAVID <- function (gene=eg$ENTREZID, 
@@ -644,8 +609,8 @@ myBoxplot_advanced <- function(data = df,
       scale_color_manual(values = mycolor)+
       theme_cowplot(font_size = fontsize)+
       theme(legend.position = "right",
-            axis.line.x = element_line( size = axislinesize ),
-            axis.line.y = element_line( size = axislinesize ),
+            axis.line = element_line( size = axislinesize ),
+            axis.ticks = element_line( size = axislinesize ),
             axis.text.x = element_text(hjust = 0.8,
                                        angle = 30))
   }
@@ -695,6 +660,12 @@ my_showcolorbar <- function(tmp.colorbar,tmp.name,n=100){
 #####20211023
 
 #####---------1. Operation function--------
+
+myMinMaxScale <- function(x){
+  (x-min(x))/(max(x)-min(x))
+}
+
+
 
 myGetGRangesFromsTxDb <- function(
   txdb = mm9KG_txdb,
@@ -746,6 +717,21 @@ my_enrichment.pvalue <- function(M,N,k,n,lower.tail=F){
 myTrunclog <- function(x){
   res <- ifelse(x>1,log10(x),0)
 }
+
+####extract and build Cellchat object
+mySeuratToCellChat <- function(tmp.seu = NULL,tmp.group.by="cell.type"){
+  tmp.mat <- GetAssayData(tmp.seu,slot = "data")
+  tmp.meta <- tmp.seu[[]]
+  ####Create CellChat object
+  ####require exp.mat to be matrix;
+  cellchat <- createCellChat(object = as.matrix(tmp.mat),
+                             meta = tmp.meta,
+                             group.by = tmp.group.by)
+  return(cellchat)
+}
+
+
+
 
 MyAverageSeurat <- function(seu.obj){
   cat("Calcualte Average Expression",sep = "\n")
@@ -868,25 +854,136 @@ myBegraphToBigwig <- function(tmp.input,tmp.output,region=NULL,tmp.seqlength=NUL
   #rtracklayer::close(con = tmp.output)
 }
 
+myGet_ggsize <- function(plot,tmp.unit="in") {
+  gtab <- patchwork:::patchworkGrob(plot)
+  
+  has_fixed_dimensions <- 
+    !gtab$widths %>% map(~is.null(attr(.x, "unit"))) %>% unlist() %>% any() |
+    !gtab$heights %>% map(~is.null(attr(.x, "unit"))) %>% unlist() %>% any()
+  
+  if (has_fixed_dimensions) {
+    width <- grid::convertWidth(sum(gtab$widths) + unit(1, "mm"), unitTo = tmp.unit, valueOnly = TRUE)
+    height <- grid::convertHeight(sum(gtab$heights) + unit(1, "mm"), unitTo = tmp.unit, valueOnly = TRUE)
+    c(width = width, height = height)
+  } else {
+    c(width = NA, height = NA)
+  }
+}
+
+get_pheatmap_dims <- function(heat_map){
+  plot_height <- sum(sapply(heat_map$gtable$heights, grid::convertHeight, "in"))
+  plot_width  <- sum(sapply(heat_map$gtable$widths, grid::convertWidth, "in"))
+  return(list(height = plot_height, width = plot_width))
+}
+
+calc_ht_size = function(ht, unit = "inch") {
+  pdf(NULL)
+  ht = draw(ht)
+  w = ComplexHeatmap:::width(ht)
+  w = convertX(w, unit, valueOnly = TRUE)
+  h = ComplexHeatmap:::height(ht)
+  h = convertY(h, unit, valueOnly = TRUE)
+  dev.off()
+  c(w, h)
+}
+
+### default to save to jpg
+myggsave <- function(p,prefix,suffix,width=8,height=8,...){
+  if(suffix==".pdf"){
+    ggsave(p,filename = myFileName(prefix = prefix,suffix = suffix),width = width,height = height,useDingbats=F,...)
+  }
+  else{
+    ggsave(p,filename = myFileName(prefix = prefix,suffix = suffix),width = width,height = height,...)
+  }
+}
+
+
+
 #####---------3. visualization--------
-mycolor.bar <- function(my.colors,min,max=-min,vertical=T,showticks=T,tmp.title=NULL){
+
+#####process colors
+mycolor.bar <- function(my.colors,
+                        min,
+                        max=-min,
+                        breaks=seq(min,max,
+                                   length.out=length(my.colors)+1),
+                        vertical=T,
+                        showticks=T,
+                        tmp.title=NULL){
   
   if(vertical){
-    z=matrix(1:100,nrow=1)
+    z=matrix(breaks,nrow=1)
     x=1
-    y=seq(min,max,len=100) # supposing 3 and 2345 are the range of your data
-    image(x,y,z,col=my.colors,axes=FALSE,xlab="",ylab="")
+    y=breaks # supposing 3 and 2345 are the range of your data
+    image(x,y,z,col = my.colors,
+          breaks = breaks,
+          axes = FALSE,xlab="",ylab="")
     axis(4,tick = showticks,lwd.ticks = 1)
     title(main = tmp.title)
   }
   else{
-    x = seq(min,max,len=100)
+    x = breaks
     y = 1
-    z=matrix(1:100,ncol=1)
-    image(x,y,z,col=my.colors,axes=FALSE,xlab="",ylab="")
+    z=matrix(breaks,ncol=1)
+    image(x,y,z,col=my.colors,
+          breaks = breaks,
+          axes=FALSE,xlab="",ylab="")
     axis(1,tick = showticks,lwd.ticks = 1)
     title(main = tmp.title)
   }
+}
+
+
+myShowColors <- function (colours, labels = TRUE, borders = NULL, cex_label = 1, 
+                          ncol = NULL,tmp.title = NULL) {
+  n <- length(colours)
+  ncol <- ncol %||% ceiling(sqrt(length(colours)))
+  nrow <- ceiling(n/ncol)
+  colours <- c(colours, rep(NA, nrow * ncol - length(colours)))
+  colours <- matrix(colours, ncol = ncol, byrow = TRUE)
+  old <- par(pty = "s", mar = c(0, 0, 1, 0))
+  on.exit(par(old))
+  size <- max(dim(colours))
+  plot(c(0, size), c(0, -size), type = "n", xlab = "", 
+       ylab = "", axes = FALSE, main = tmp.title)
+  rect(col(colours) - 1, -row(colours) + 1, col(colours), -row(colours), 
+       col = colours, border = borders)
+  if (labels) {
+    hcl <- farver::decode_colour(colours, "rgb", "hcl")
+    label_col <- ifelse(hcl[, "l"] > 50, "black", 
+                        "white")
+    text(col(colours) - 0.5, -row(colours) + 0.5, colours, 
+         cex = cex_label, col = label_col)
+  }
+}
+
+myBedTrack <- function(bed.input = tmp.files,
+                       tmp.region,
+                       track.color,
+                       font_size = 18,
+                       tmp.label = "2cell"){
+  tmp.df <- read.delim(file = bed.input,header = F)
+  tmp.region <- as(tmp.region,"GRanges")
+  names(tmp.df)[1:3] <- c("chr", "xmin", "xmax")
+  tmp.df.plot <- tmp.df %>%
+    dplyr::filter(chr == as.character(chrom(tmp.region)))
+  
+  p <- ggplot()+
+    geom_rect(ggplot2::aes(xmin = xmin, ymin = 0, 
+                           xmax = xmax, ymax = 1),
+              fill = track.color,
+              data = tmp.df.plot)+
+    ylab(tmp.label)+
+    scale_x_continuous(limits = c(start(tmp.region),end(tmp.region)),
+                       expand = c(0,0))+
+    scale_y_continuous(expand = c(0,0))+
+    theme_cowplot(font_size = font_size)+
+    theme(axis.line.y = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks = element_line(size = 0.5),
+          axis.title.y = element_text(angle = 0,vjust = 0.5),
+          axis.ticks.y = element_blank())
+  return(p)
 }
 
 
@@ -1231,7 +1328,574 @@ get_plot_dims <- function(heat_map){
   return(list(height = plot_height, width = plot_width))
 }
 
-#####---------3.1 defien colors --------
+# myFunction <- function(p){
+#   tmp.range.x <- round(range(p$data$UMAP_1))-1
+#   tmp.range.y <- round(range(p$data$UMAP_2))-1
+#   tmp.ticks.x <- seq(tmp.range.x[1],tmp.range.x[2],length.out=20)
+#   tmp.ticks.y <- seq(tmp.range.y[1],tmp.range.y[2],length.out=20)
+#   list(geom_path(data = data.frame(x=tmp.ticks.x[1:2],
+#                                    y=tmp.ticks.y[c(1,1)]),
+#                  size = 1,
+#                  mapping = aes(x,y),
+#                  linejoin = "bevel", 
+#                  lineend = "round",
+#                  arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+#        geom_path(data = data.frame(x=tmp.ticks.x[c(1,1)],
+#                                    y=tmp.ticks.y[1:2]),
+#                  size = 1,
+#                  mapping = aes(x,y),
+#                  linejoin = "bevel", 
+#                  lineend = "round",
+#                  arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+#        annotate("text",x = mean(tmp.ticks.x[1:2]),
+#                 y = 2*tmp.ticks.y[1]-tmp.ticks.y[2],label="UMAP1",fontface="bold",size=4),
+#        annotate("text",x = 2*tmp.ticks.x[1]-tmp.ticks.x[2],
+#                 y = mean(tmp.ticks.y[1:2]),label="UMAP2",fontface="bold",size=4,angle=90),
+#        NoAxes())
+# }
+
+myFeatureplot <- function(seu=pbmc3k.final,dim.use="tSNE",font.size=14,pt.size=3,
+                          features=tmp.markers,tmp.color=coolwarm(100),tmp.ncol=2){
+  plot.list <- lapply(features, function(ii){
+    p <- FeaturePlot(seu,features = ii,pt.size = pt.size,raster = T) 
+    tmp.data.plot <- p$data %>%
+      arrange(!!sym(eval(ii)))
+    p <- ggplot(data = tmp.data.plot)+
+      scattermore::geom_scattermore(mapping = aes(!!sym(paste0(dim.use,"_1")),
+                                                  !!sym(paste0(dim.use,"_2")),
+                                                  color=!!sym(eval(ii))),
+                                    pointsize = 3)+
+      scale_color_gradientn(colors  = tmp.color,name=NULL)+
+      ggtitle(ii)+
+      theme_cowplot(font_size = font.size)
+    return(p)
+  })
+  wrap_plots(plot.list,ncol = tmp.ncol)
+}
+
+myAddSeuratAxis <- function(p,reduction="tsne",tmp.ratio=0.3,tmp.fontsize=6){
+  if (reduction == "tsne") {
+    tmp.range.x <- round(range(p$data$tSNE_1))-1
+    tmp.range.y <- round(range(p$data$tSNE_2))-1
+    tmp.ticks.x <- seq(tmp.range.x[1],tmp.range.x[2],length.out=10)
+    tmp.ticks.y <- seq(tmp.range.y[1],tmp.range.y[2],length.out=10)
+    tmp.step.x <- tmp.ticks.x[2]-tmp.ticks.x[1]
+    tmp.step.y <- tmp.ticks.y[2]-tmp.ticks.y[1]
+    list(geom_path(data = data.frame(x=tmp.ticks.x[1:2],
+                                     y=tmp.ticks.y[c(1,1)]),
+                   size = 1,
+                   mapping = aes(x,y),
+                   linejoin = "bevel",
+                   lineend = "round",
+                   arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+         geom_path(data = data.frame(x=tmp.ticks.x[c(1,1)],
+                                     y=tmp.ticks.y[1:2]),
+                   size = 1,
+                   mapping = aes(x,y),
+                   linejoin = "bevel",
+                   lineend = "round",
+                   arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+         annotate("text",x = mean(tmp.ticks.x[1:2]),
+                  y = tmp.ticks.y[1]-tmp.ratio*tmp.step.y,label="tSNE1",fontface="bold",size=tmp.fontsize),
+         annotate("text",x = tmp.ticks.x[1]-tmp.ratio*tmp.step.x,
+                  y = mean(tmp.ticks.y[1:2]),label="tSNE2",fontface="bold",size=tmp.fontsize,angle=90),
+         NoAxes(),
+         theme(plot.title = element_text(size = 24),
+               legend.text = element_text(size = 24)))
+  }
+  
+  if(reduction == "umap"){
+    tmp.range.x <- round(range(p$data$UMAP_1))-1
+    tmp.range.y <- round(range(p$data$UMAP_2))-1
+    tmp.ticks.x <- seq(tmp.range.x[1],tmp.range.x[2],length.out=10)
+    tmp.ticks.y <- seq(tmp.range.y[1],tmp.range.y[2],length.out=10)
+    tmp.step.x <- tmp.ticks.x[2]-tmp.ticks.x[1]
+    tmp.step.y <- tmp.ticks.y[2]-tmp.ticks.y[1]
+    list(geom_path(data = data.frame(x=tmp.ticks.x[1:2],
+                                     y=tmp.ticks.y[c(1,1)]),
+                   size = 1,
+                   mapping = aes(x,y),
+                   linejoin = "bevel",
+                   lineend = "round",
+                   arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+         geom_path(data = data.frame(x=tmp.ticks.x[c(1,1)],
+                                     y=tmp.ticks.y[1:2]),
+                   size = 1,
+                   mapping = aes(x,y),
+                   linejoin = "bevel",
+                   lineend = "round",
+                   arrow = arrow(angle = 45,type = "closed",length = unit(0.1, "inches"))),
+         annotate("text",x = mean(tmp.ticks.x[1:2]),
+                  y = tmp.ticks.y[1]-tmp.ratio*tmp.step.y,
+                  label="UMAP_1",fontface="bold",size=tmp.fontsize),
+         annotate("text",x = tmp.ticks.x[1]-tmp.ratio*tmp.step.x,
+                  y = mean(tmp.ticks.y[1:2]),
+                  label="UMAP_2",fontface="bold",size=tmp.fontsize,angle=90),
+         NoAxes(),
+         theme(plot.title = element_text(size = 24),
+               legend.text = element_text(size = 24)))
+  }
+}
+
+
+
+pheatmap_fixed <- function (mat, color = colorRampPalette(rev(brewer.pal(n = 7, 
+                                                                     name = "RdYlBu")))(100), kmeans_k = NA, breaks = NA, 
+                        border_color = ifelse(nrow(mat) < 100 & ncol(mat) < 100, 
+                                              "grey60", NA), cellwidth = NA, cellheight = NA, 
+                        scale = "none", cluster_rows = TRUE, cluster_cols = TRUE, 
+                        clustering_distance_rows = "euclidean", clustering_distance_cols = "euclidean", 
+                        clustering_method = "complete", clustering_callback = NA, 
+                        cutree_rows = NA, cutree_cols = NA, treeheight_row = ifelse(class(cluster_rows) == 
+                                                                                      "hclust" || cluster_rows, 50, 0), treeheight_col = ifelse(class(cluster_cols) == 
+                                                                                                                                                  "hclust" || cluster_cols, 50, 0), legend = TRUE, 
+                        legend_breaks = NA, legend_labels = NA, annotation_row = NA, 
+                        annotation_col = NA, annotation = NA, annotation_colors = NA, 
+                        annotation_legend = TRUE, annotation_names_row = TRUE, annotation_names_col = TRUE, 
+                        drop_levels = TRUE, show_rownames = TRUE, show_colnames = TRUE, 
+                        main = NA, fontsize = 10, fontsize_row = fontsize, fontsize_col = fontsize, 
+                        angle_col = c("270", "0", "45", "90", 
+                                      "315"), display_numbers = FALSE, number_format = "%.2f", 
+                        number_color = "grey30", fontsize_number = 0.8 * fontsize, 
+                        gaps_row = NULL, gaps_col = NULL, labels_row = NULL, labels_col = NULL, 
+                        filename = NA, width = NA, height = NA, silent = FALSE, na_col = "#DDDDDD", 
+                        name = NULL, heatmap_legend_param = list(), ..., run_draw = FALSE) 
+{
+  if (is.data.frame(mat)) {
+    ComplexHeatmap:::warning_wrap("The input is a data frame, convert it to the matrix.")
+    mat = as.matrix(mat)
+  }
+  if (!identical(kmeans_k, NA)) {
+    ComplexHeatmap:::warning_wrap("argument `kmeans_k` is not suggested to use in pheatmap -> Heatmap translation because it changes the input matrix. You might check `row_km` and `column_km` arguments in Heatmap().")
+    km = kmeans(mat, centers = kmeans_k)
+    mat = km$centers
+    rownames(mat) = paste0("Cluster: ", seq_along(km$size), 
+                           ", Size: ", km$size)
+  }
+  if ("row" %in% scale) {
+    if (any(is.na(mat))) {
+      mat = (mat - rowMeans(mat, na.rm = TRUE))/rowSds(mat, 
+                                                       na.rm = TRUE)
+    }
+    else {
+      mat = t(scale(t(mat)))
+    }
+  }
+  else if ("column" %in% scale) {
+    if (any(is.na(mat))) {
+      mat = t((t(mat) - colMeans(mat, na.rm = TRUE))/colSds(mat, 
+                                                            na.rm = TRUE))
+    }
+    else {
+      mat = scale(mat)
+    }
+  }
+  ht_param = list(matrix = mat)
+  if (!identical(scale, "none") && !identical(breaks, 
+                                              NA)) {
+    ComplexHeatmap:::warning_wrap("It not suggested to both set `scale` and `breaks`. It makes the function confused.")
+  }
+  if (is.function(color)) {
+    ht_param$col = color
+    if (!identical(breaks, NA)) {
+      ComplexHeatmap:::warning_wrap("`breaks` is ignored when `color` is set as a color mapping function.")
+    }
+  }
+  else {
+    if (identical(breaks, NA)) {
+      n_col = length(color)
+      if (identical(scale, "row") || identical(scale, 
+                                               "column")) {
+        lim = max(abs(mat), na.rm = TRUE)
+        ht_param$col = circlize::colorRamp2(seq(-lim, lim, length = n_col), 
+                                            color)
+      }
+      else {
+        ht_param$col = circlize::colorRamp2(seq(min(mat, na.rm = TRUE), 
+                                                max(mat, na.rm = TRUE), length = n_col), color)
+      }
+    }
+    else {
+      if (length(breaks) == length(color) + 1) {
+        ht_param$col = local({
+          breaks = breaks
+          color = color
+          fun = function(x) {
+            n = length(color)
+            df = data.frame(start = c(-Inf, breaks[seq_len(n)], 
+                                      breaks[n + 1]), end = c(breaks[1], breaks[1 + 
+                                                                                  seq_len(n)], Inf))
+            ind = numeric(length(x))
+            for (i in seq_along(x)) {
+              ind[i] = which(df$start <= x[i] & df$end > 
+                               x[i])
+            }
+            ind = ind - 1
+            ind[ind < 1] = 1
+            ind[ind > n] = n
+            color[ind]
+          }
+          attr(fun, "breaks") = breaks
+          fun
+        })
+      }
+      else if (length(breaks) == length(color)) {
+        ht_param$col = circlize::colorRamp2(breaks, color)
+      }
+      else {
+        n_col = length(color)
+        ht_param$col = circlize::colorRamp2(seq(min(breaks), max(breaks), 
+                                                length = n_col), color)
+        ComplexHeatmap:::warning_wrap("`breaks` does not have the same length as `color`. The colors are interpolated from the minimal to the maximal of `breaks`.")
+      }
+    }
+  }
+  if (!identical(filename, NA)) {
+    ComplexHeatmap:::warning_wrap("argument `filename` is not supported in pheatmap -> Heatmap translation, skip it.")
+  }
+  if (!identical(width, NA)) {
+    ComplexHeatmap:::warning_wrap("argument `width` is not supported in pheatmap -> Heatmap translation, skip it.")
+  }
+  if (!identical(height, NA)) {
+    ComplexHeatmap:::warning_wrap("argument `height` is not supported in pheatmap -> Heatmap translation, skip it.")
+  }
+  if (!identical(silent, FALSE)) {
+    ComplexHeatmap:::warning_wrap("argument `silent` is not supported in pheatmap -> Heatmap translation, skip it.")
+  }
+  ht_param$rect_gp = gpar(col = border_color)
+  if (nrow(mat) > 1000 || ncol(mat) > 1000) {
+    if (!is.na(border_color)) {
+      ComplexHeatmap:::warning_wrap("border color is set for the matrix with large numbers of rows or columns. You might only be able to see the border colors in the plot. Set `border_color = NA` to get rid of it.")
+    }
+  }
+  if (!identical(cellwidth, NA)) {
+    ht_param$width = ncol(mat) * unit(cellwidth, "pt")
+  }
+  if (!identical(cellheight, NA)) {
+    ht_param$height = nrow(mat) * unit(cellheight, "pt")
+  }
+  if (identical(clustering_distance_rows, "correlation")) 
+    clustering_distance_rows = "pearson"
+  if (identical(clustering_distance_cols, "correlation")) 
+    clustering_distance_cols = "pearson"
+  ht_param$cluster_rows = cluster_rows
+  ht_param$cluster_columns = cluster_cols
+  ht_param$clustering_distance_rows = clustering_distance_rows
+  ht_param$clustering_distance_columns = clustering_distance_cols
+  ht_param$clustering_method_rows = clustering_method
+  ht_param$clustering_method_columns = clustering_method
+  if (!is.na(cutree_rows)) {
+    if (inherits(cluster_rows, c("logical", "hclust", 
+                                 "dendrogram"))) {
+      ht_param$row_split = cutree_rows
+      ht_param$row_gap = unit(4, "bigpts")
+      ht_param["row_title"] = list(NULL)
+    }
+  }
+  if (!is.na(cutree_cols)) {
+    if (inherits(cluster_cols, c("logical", "hclust", 
+                                 "dendrogram"))) {
+      ht_param$column_split = cutree_cols
+      ht_param$column_gap = unit(4, "bigpts")
+      ht_param["column_title"] = list(NULL)
+    }
+  }
+  ht_param$row_dend_width = unit(treeheight_row, "pt")
+  ht_param$column_dend_height = unit(treeheight_col, "pt")
+  ht_param$show_heatmap_legend = legend
+  if (identical(scale, "row") || identical(scale, "column")) {
+    if (identical(legend_breaks, NA)) {
+      lim = quantile(abs(mat), 0.975)
+      le = pretty(c(-lim, lim), n = 3)
+      if (length(le) == 7 && le[1] == -3) {
+        le = c(-3, -1.5, 0, 1.5, 3)
+      }
+      else if (!0 %in% le) {
+        le = c(le[1], le[1]/2, 0, le[length(le)]/2, le[length(le)])
+      }
+      legend_breaks = le
+    }
+  }
+  if (!identical(legend_breaks, NA)) {
+    heatmap_legend_param$at = legend_breaks
+  }
+  if (!identical(legend_labels, NA)) {
+    heatmap_legend_param$labels = legend_labels
+  }
+  ht_param$heatmap_legend_param = list(title_gp=gpar(fontsize=fontsize,fontface="bold"),
+                                       labels_gp = gpar(fontsize = fontsize*0.8))
+  if (identical(annotation_colors, NA)) {
+    annotation_colors = list()
+  }
+  if (!identical(annotation_col, NA)) {
+    acn = rownames(annotation_col)
+    mcn = colnames(mat)
+    if (!is.null(acn)) {
+      if (acn[1] %in% mcn) {
+        if (length(union(acn, mcn)) == length(mcn)) {
+          if (!identical(acn, mcn)) {
+            ComplexHeatmap:::warning_wrap("Column annotation has different order from matrix columns. Adjust the column annotation based on column names of the matrix.")
+          }
+          annotation_col = annotation_col[mcn, , drop = FALSE]
+        }
+      }
+    }
+    for (nm in colnames(annotation_col)) {
+      if (nm %in% names(annotation_colors)) {
+        if (is.null(names(annotation_colors[[nm]])) && 
+            is.numeric(annotation_col[, nm])) {
+          foo_x = annotation_col[, nm]
+          foo_n_col = length(annotation_colors[[nm]])
+          annotation_colors[[nm]] = circlize::colorRamp2(seq(min(foo_x), 
+                                                             max(foo_x), length = foo_n_col), annotation_colors[[nm]])
+        }
+      }
+    }
+    ht_param$top_annotation = HeatmapAnnotation(df = annotation_col[, 
+                                                                    ncol(annotation_col):1, drop = FALSE], col = annotation_colors, 
+                                                show_legend = annotation_legend, show_annotation_name = annotation_names_col, 
+                                                annotation_legend_param = list(title_gp=gpar(fontsize=fontsize,fontface="bold"),
+                                                                               labels_gp = gpar(fontsize = fontsize*0.8)),
+                                                gp = gpar(col = border_color), annotation_name_gp = gpar(fontsize = fontsize, 
+                                                                                                         fontface = "bold"), simple_anno_size = unit(10, 
+                                                                                                                                                     "bigpts"), gap = unit(2, "bigpts"))
+  }
+  if (!identical(annotation_row, NA)) {
+    arn = rownames(annotation_row)
+    mrn = rownames(mat)
+    if (!is.null(arn)) {
+      if (arn[1] %in% mrn) {
+        if (length(union(arn, mrn)) == length(mrn)) {
+          if (!identical(arn, mrn)) {
+            ComplexHeatmap:::warning_wrap("Row annotation has different order from matrix rows. Adjust the row annotation based on row names of the matrix.")
+          }
+          annotation_row = annotation_row[mrn, , drop = FALSE]
+        }
+      }
+    }
+    for (nm in colnames(annotation_row)) {
+      if (nm %in% names(annotation_colors)) {
+        if (is.null(names(annotation_colors[[nm]])) && 
+            is.numeric(annotation_row[, nm])) {
+          foo_x = annotation_row[, nm]
+          foo_n_col = length(annotation_colors[[nm]])
+          annotation_colors[[nm]] = circlize::colorRamp2(seq(min(foo_x), 
+                                                             max(foo_x), length = foo_n_col), annotation_colors[[nm]])
+        }
+      }
+    }
+    ht_param$left_annotation = rowAnnotation(df = annotation_row[, 
+                                                                 ncol(annotation_row):1, drop = FALSE], col = annotation_colors, 
+                                             show_legend = annotation_legend, show_annotation_name = annotation_names_row, 
+                                             annotation_legend_param = list(title_gp=gpar(fontsize=fontsize,fontface="bold"),
+                                                                            labels_gp = gpar(fontsize = fontsize*0.8)),
+                                             gp = gpar(col = border_color), annotation_name_gp = gpar(fontsize = fontsize, 
+                                                                                                      fontface = "bold"), simple_anno_size = unit(10, 
+                                                                                                                                                  "bigpts"), gap = unit(2, "bigpts"))
+  }
+  if (!identical(annotation, NA)) {
+    ComplexHeatmap:::warning_wrap("argument `annotation` is not supported in pheatmap -> Heatmap translation, skip it.")
+  }
+  if (identical(drop_levels, FALSE)) {
+    ComplexHeatmap:::warning_wrap("argument `drop_levels` is enfored to be TRUE, skip it.")
+  }
+  ht_param$show_row_names = show_rownames
+  ht_param$show_column_names = show_colnames
+  ht_param$row_names_gp = gpar(fontsize = fontsize_row)
+  ht_param$column_names_gp = gpar(fontsize = fontsize_col)
+  angle_col = match.arg(angle_col)[1]
+  angle_col = switch(angle_col, `0` = 0, `45` = 45, 
+                     `90` = 90, `270` = 90, `315` = -45)
+  ht_param$column_names_rot = angle_col
+  if (angle_col == 0) {
+    ht_param$column_names_centered = TRUE
+  }
+  if (is.logical(display_numbers)) {
+    if (display_numbers) {
+      ht_param$layer_fun = local({
+        number_format = number_format
+        number_color = number_color
+        fontsize_number = fontsize_number
+        mat = mat
+        function(j, i, x, y, w, h, fill) {
+          grid.text(sprintf(number_format, pindex(mat, 
+                                                  i, j)), x = x, y = y, gp = gpar(col = number_color, 
+                                                                                  fontsize = fontsize_number))
+        }
+      })
+    }
+  }
+  else if (is.matrix(display_numbers)) {
+    if (!identical(dim(display_numbers), dim(mat))) {
+      stop_wrap("dimension of `display_numbers` should be the same as the input matrix.")
+    }
+    ht_param$layer_fun = local({
+      number_color = number_color
+      fontsize_number = fontsize_number
+      mat = display_numbers
+      function(j, i, x, y, w, h, fill) {
+        grid.text(pindex(mat, i, j), x = x, y = y, gp = gpar(col = number_color, 
+                                                             fontsize = fontsize_number))
+      }
+    })
+  }
+  if (!is.null(labels_row)) {
+    ht_param$row_labels = labels_row
+  }
+  if (!is.null(labels_col)) {
+    ht_param$column_labels = labels_col
+  }
+  if (!is.null(gaps_row)) {
+    if (inherits(cluster_rows, c("hclust", "dendrogram"))) {
+      stop_wrap("`gaps_row` should not be set when `cluster_rows` is set as a clustering object.")
+    }
+    if (identical(cluster_rows, TRUE)) {
+      stop_wrap("`gaps_row` should not be set when `cluster_rows` is set to TRUE.")
+    }
+    slices = diff(c(0, gaps_row, nrow(mat)))
+    ht_param$row_split = rep(seq_along(slices), times = slices)
+    ht_param$row_gap = unit(4, "bigpts")
+    ht_param["row_title"] = list(NULL)
+  }
+  if (!is.null(gaps_col)) {
+    if (inherits(cluster_cols, c("hclust", "dendrogram"))) {
+      stop_wrap("`gaps_col` should not be set when `cluster_cols` is set as a clustering object.")
+    }
+    if (identical(cluster_cols, TRUE)) {
+      stop_wrap("`gaps_col` should not be set when `cluster_cols` is set to TRUE.")
+    }
+    slices = diff(c(0, gaps_col, ncol(mat)))
+    ht_param$column_split = rep(seq_along(slices), times = slices)
+    ht_param$column_gap = unit(4, "bigpts")
+    ht_param["column_title"] = list(NULL)
+  }
+  if (!identical(clustering_callback, NA)) {
+    if (!identical(ht_param$cluster_rows, FALSE)) {
+      row_hclust = hclust(get_dist(mat, ht_param$clustering_distance_rows), 
+                          ht_param$clustering_method_rows)
+      row_hclust = clustering_callback(row_hclust, ...)
+      ht_param$cluster_rows = row_hclust
+    }
+    if (!identical(ht_param$cluster_columns, FALSE)) {
+      column_hclust = hclust(get_dist(t(mat), ht_param$clustering_distance_columns), 
+                             ht_param$clustering_method_columns)
+      column_hclust = clustering_callback(column_hclust, 
+                                          ...)
+      ht_param$cluster_columns = column_hclust
+    }
+  }
+  ht_param$name = name
+  ht_param$row_dend_reorder = FALSE
+  ht_param$column_dend_reorder = FALSE
+  if (!identical(main, NA)) {
+    ht_param$column_title = main
+    ht_param$column_title_gp = gpar(fontface = "bold", 
+                                    fontsize = 1.3 * fontsize)
+  }
+  ht_param = c(ht_param, list(...))
+  ht = do.call(Heatmap, ht_param)
+  attr(ht, "translate_from") = "pheatmap"
+  if (run_draw) {
+    draw(ht)
+  }
+  else {
+    ht
+  }
+  #return(ht_param)
+}
+
+
+
+####define function
+myenrichGO_plot <- function(data.plot,
+                            p.adjust.cut=0.01,
+                            show_number=20,
+                            title="The Most Enriched GO Terms",
+                            fill.color="#8DA1CB",
+                            plot.ylab="BP",
+                            term.pos.adjust=0,
+                            font.size = 12,
+                            text.size=5.8,
+                            tmp.alpha=0.8){
+  
+  data.plot <- tmp.df
+  data.plot$logp.adjust <- -log10(data.plot$p.adjust)
+  data.plot <- data.plot%>%
+    dplyr::filter(p.adjust < p.adjust.cut) %>%
+    slice_max(order_by = logp.adjust,
+              n=show_number,
+              with_ties=F)
+  data.plot$Description <- factor(data.plot$Description,
+                                     levels = rev(data.plot$Description))
+  
+  data.term <- data.frame(x = 0,
+                          y = row_number(data.plot$Description),
+                          label = data.plot$Description,
+                          stringsAsFactors = F)
+  p1 <- ggplot() + 
+    geom_bar(data = data.plot, aes_string(x = "Description", 
+                                          y = "logp.adjust"),
+             stat = "identity",
+             fill=fill.color,alpha=tmp.alpha)+
+    coord_flip() +
+    ggtitle(title)+
+    xlab(plot.ylab)+
+    ylab(expression(-log[10](p.just)))+
+    geom_text(data = data.term, 
+              aes(x=y,y=x,label = label), 
+              color = "black",
+              hjust = term.pos.adjust,
+              size = text.size)+
+    theme_cowplot(font_size = font.size) +
+    scale_y_continuous(expand = c(0,0))+
+    theme(axis.text.y = element_blank(),
+          axis.line.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.x = element_line(size = 1),
+          axis.ticks.x = element_line(size = 1),
+          plot.title = element_text(hjust=0.5))
+  return(p1)
+}
+
+
+
+####Define my theme
+
+myGridTheme <- function (font.size = 14) 
+{
+  theme_bw() + theme(axis.text.x = element_text(colour = "black", 
+                                                size = font.size*6/7, vjust = 1), 
+                     axis.text.y = element_text(colour = "black", 
+                                                size = font.size, hjust = 1), 
+                     axis.title = element_text(margin = margin(10, 5, 0, 0), 
+                                               color = "black", size = font.size), 
+                     axis.title.y = element_text(angle = 90),
+                     legend.title = element_text(size = font.size),
+                     legend.text = element_text(size = font.size*2/3))
+}
+
+
+##### draw same in base plot
+# t <- data.frame(P_Value=1:10,Description=stringi::stri_rand_strings(10, 10),stringsAsFactors = F)
+# stringi::stri_rand_strings(10, 5)
+# t$P.Value
+# barplot(as.numeric(t$P_Value),
+#         horiz=T,
+#         xlim=c(0,max(t$P_Value)+0.5),
+#         axes=T,
+#         #col="lightblue",
+#         col = "pink",
+#         xlab ="-log10(p-value)",
+#         cex.axis=1.3,
+#         cex.lab=1,
+#         border = NA) 
+# for (i in 1:nrow(t)){
+#   text(0,(1.2*i-0.6),t$Description[i],cex=1.2,pos=4)
+# }
+
+
+
+#####---------4. defien colors --------
 rdbu <- colorRampPalette(rev(RColorBrewer::brewer.pal(11,"RdBu"))) 
 test.color.2 <- colorRampPalette(c("Orange","lightgoldenrod","darkgreen"))
 col.spectral <- colorRampPalette(brewer.pal(11,'Spectral')[-6])
@@ -1240,9 +1904,292 @@ rdwhbu <- colorRampPalette(c("navy", "white", "brown3"))
 skyblueYelow <- colorRampPalette(c("skyblue","black","yellow"))
 skybluered <- colorRampPalette(c("skyblue","black","orange"))
 solarExtra <- colorRampPalette(c("#3361A5","#248AF3","#14B3FF","#88CEEF","#C1D5DC","#EAD397","#FDB31A","#E42A2A","#A31D1D"))
+blues <- colorRampPalette(colors = brewer.pal(9,"Blues"))
+ylord <- colorRampPalette(colors = brewer.pal(9,"YlOrRd"))
 hic.red <- colorRampPalette(c("white","red"))
 hic.orage <- colorRampPalette(brewer.pal(9,"Oranges"))
+cold <- colorRampPalette(c('#f7fcf0','#41b6c4','#253494','#081d58'))
+warm <- colorRampPalette(c('#ffffb2','#fecc5c','#e31a1c','#800026'))
+mypalette <- c(rev(cold(21)), warm(20))
+coldwarm <- colorRampPalette(colors = mypalette)
+coolwarm <- colorRampPalette(colors = c("#3B4CC0", "#4F6AD9", "#6585EC", "#7B9FF9", "#93B5FF", 
+                                        "#AAC7FD", "#C0D4F5", "#D4DBE6", "#E5D8D1", "#F2CBB7",
+                                        "#F7B89C", "#F6A081", "#EE8568",
+                                        "#E0654F", "#CC4039", "#B40426"))
+ramp <- colorRampPalette(c("white","pink","red","black"))
+
+bkcolor <- c(colorRampPalette(c(brewer.pal(9,"Blues" )[4:9],"#1a1919"))(50),
+             colorRampPalette(c("#1a1919",rev(brewer.pal( 9,"YlOrBr" ))[1:6]))(50))
+
+bkcolor <- colorRampPalette(colors = bkcolor)
+hic.pca.red <- colorRampPalette(c("blue","gray1","red"))
+hic.pca.redwhite <- colorRampPalette(c("#1d1856","navyblue","white","red4","#861617"))
+hic.pca.orange <- colorRampPalette(c("#2f2583","black","#f9b232"))
+hic.pca.skyblue <- colorRampPalette(c("skyblue","black","orange"))
+
+okabe_ito <- colorRampPalette(colors = c("#e59f01","#56b4e8","#009f73","#f0e442","#0072b1","#d55e00","#cc79a7","#999999","#000000"))
+OrBl_div <- colorRampPalette(colors = c("#9f3d22","#be4d21","#db6525","#ef8531","#f1ac73","#d8d4c9","#a1bccf","#6fa3cb","#5689b6","#4171a1","#2b5b8b"))
 
 
 
+###gundam
+strike_freedom_gundam_color <- colorRampPalette(colors = c("brown3","#eff3ff","navy","#373b35","#b1b0c2","#f2be58"))
+
+npg.color <- colorRampPalette(colors = ggsci:::ggsci_db$npg$nrc) 
+
+#mycolor.bar(hic.pca.red(100),min = -1,max = 1)
+divergentcolor <- function (n) {
+  colorSpace <- c("#E41A1C", "#377EB8", "#4DAF4A", 
+                  "#984EA3", "#F29403", "#F781BF", "#BC9DCC", 
+                  "#A65628", "#54B0E4", "#222F75", "#1B9E77", 
+                  "#B2DF8A", "#E3BE00", "#FB9A99", "#E7298A", 
+                  "#910241", "#00CDD1", "#A6CEE3", "#CE1261", 
+                  "#5E4FA2", "#8CA77B", "#00441B", "#DEDC00", 
+                  "#B3DE69", "#8DD3C7", "#999999")
+  if (n <= length(colorSpace)) {
+    colors <- colorSpace[1:n]
+  }
+  else {
+    colors <- (grDevices::colorRampPalette(colorSpace))(n)
+  }
+  return(colors)
+}
+
+####some more divergent color
+####from monet
+monet.sunset <- colorRampPalette(colors = c("#272924","#323c48","#67879c",
+                  "#7d9390","#d7695a","#ba9f84"))
+monet.sunumbrella.women <- colorRampPalette(colors = c("#aed1e4","#bcdde2","#e8e7d5",
+                                                       "#f1ede9","#e6cec2","#e49d40",
+                                                       "#ddcb3e","#a39524","#89af7a",
+                                                       "#744054","#aea3a9"))
+monet.cliff <- colorRampPalette(colors = c("#242a26","#3c5653","#bacbc3","#3d4b6e",
+                                           "#6f799d","#b3bedc","#f0f0f2","#898788",
+                                           "#ddd0bd"))
+####show pictures
+pic.green <- colorRampPalette(colors = c("#344A23","#726342","#383812","#879979"))
+pic.blue <- colorRampPalette(colors = c("#0B2C26","#004054","#95B7B6","#DFE5E1","#C26441"))
+pic.green2 <- colorRampPalette(colors = c("#61776B","#A6AA8B","#B6C7D7","#EFEBEC","#E79A61"))
+pic.beauty <- colorRampPalette(colors = c("#2F5365","#8A8E8F","#435D2E","#09200B","#CDBBA4","#D04A49"))
+pic.beauty2 <- colorRampPalette(colors = c("#4B6032","#436A4D","#DFB28D","#BF4E31","#87988E"))
+pic.beauty3 <- colorRampPalette(colors = c("#DB9371","#FCE6D8","#EB9B63","#DBD6C9","#666E20"))
+pic.greenblue <- colorRampPalette(colors = c("#86AFA9","#E9A419","#FC8550","#F7C9BA","#8C5E51"))
+pic.boy <- colorRampPalette(colors = c("#7C7F62","#956A3D","#625A58","#B1B1B1","#D8D4D5"))
+pic.fellows <- colorRampPalette(colors = c("#193B14","#85A063","#8A4925","#C5947E","#ACA9A2"))
+pic.girl <- colorRampPalette(colors = c("#1B3E64","#BE1705","#D77363","#84865D","#E2B88D"))
+pic.girl2 <- colorRampPalette(colors = c("#BF593F","#DAAE7D","#AAC5DA","#DAC1BA","#141A22"))
+molandi.color <- c("#e4d4c5","#c6b1ac","#764e56",
+                   "#f9d9c0","#d19477","#93675a",
+                   "#f0e9cd","#b9a783","#796656",
+                   "#cdc1b1","#a2967e","#656356",
+                   "#d8e7e4","#9eb2b1","#5a6873",
+                   "#ccd8b0","#7e8563","#50463d")
+molandi.color <- colorRampPalette(colors = molandi.color)
+#scales::show_col(pic.girl2(10))
+
+####-------5.misc function-----------
+
+####-------5.1 ----------
+MyMonocle2DiffGene <- function (cds, fullModelFormulaStr = "~CellType", 
+                                reducedModelFormulaStr = "~1", 
+                                relative_expr = TRUE, 
+                                cores = 10, 
+                                verbose = FALSE) 
+{
+  status <- NA
+  if (class(cds)[1] != "CellDataSet") {
+    stop("Error cds is not of type 'CellDataSet'")
+  }
+  all_vars <- c(all.vars(formula(fullModelFormulaStr)), 
+                all.vars(formula(reducedModelFormulaStr)))
+  pd <- pData(cds)
+  for (i in all_vars) {
+    x <- pd[, i]
+    if (any((c(Inf, NaN, NA) %in% x))) {
+      stop("Error: Inf, NaN, or NA values were located in pData of cds in columns mentioned in model terms")
+    }
+  }
+  if (relative_expr && cds@expressionFamily@vfamily %in% c("negbinomial", 
+                                                           "negbinomial.size")) {
+    if (is.null(sizeFactors(cds)) || sum(is.na(sizeFactors(cds)))) {
+      stop("Error: to call this function with relative_expr==TRUE, you must first call estimateSizeFactors() on the CellDataSet.")
+    }
+  }
+  if (cores > 1) {
+    diff_test_res <- mcesApply(cds, 1, 
+                               monocle:::diff_test_helper, 
+                               c("BiocGenerics", "VGAM", "Matrix"), 
+                               cores = cores, 
+                               fullModelFormulaStr = fullModelFormulaStr, 
+                               reducedModelFormulaStr = reducedModelFormulaStr, 
+                               expressionFamily = cds@expressionFamily, 
+                               relative_expr = relative_expr, 
+                               disp_func = cds@dispFitInfo[["blind"]]$disp_func, 
+                               verbose = verbose)
+    diff_test_res
+  }
+  else {
+    diff_test_res <- smartEsApply(cds, 1, diff_test_helper, 
+                                  convert_to_dense = TRUE, fullModelFormulaStr = fullModelFormulaStr, 
+                                  reducedModelFormulaStr = reducedModelFormulaStr, 
+                                  expressionFamily = cds@expressionFamily, relative_expr = relative_expr, 
+                                  disp_func = cds@dispFitInfo[["blind"]]$disp_func, 
+                                  verbose = verbose)
+    diff_test_res
+  }
+  diff_test_res <- do.call(rbind.data.frame, diff_test_res)
+  diff_test_res$qval <- 1
+  diff_test_res$qval[which(diff_test_res$status == "OK")] <- p.adjust(subset(diff_test_res, 
+                                                                             status == "OK")[, "pval"], method = "BH")
+  diff_test_res <- merge(diff_test_res, fData(cds), by = "row.names")
+  row.names(diff_test_res) <- diff_test_res[, 1]
+  diff_test_res[, 1] <- NULL
+  return(diff_test_res[row.names(cds), ])
+}
+####-------5.2 CellChat----------
+####This function was used for CellChatCompare
+myCompareInteractions <- function (object, measure = c("count", "weight"), 
+                                   color.use = NULL, group = NULL, 
+                                   group.levels = NULL, group.facet = NULL, 
+                                   group.facet.levels = NULL, 
+                                   n.row = 1, color.alpha = 1, legend.title = NULL, 
+                                   width = 0.6, title.name = NULL, 
+                                   digits = 3, xlabel = NULL, 
+                                   ylabel = NULL, remove.xtick = FALSE, 
+                                   show.legend = TRUE, 
+                                   label.size = 3,
+                                   x.lab.rot = FALSE, angle.x = 45, 
+                                   vjust.x = NULL, hjust.x = 1, 
+                                   size.text = 10) 
+{
+  measure <- match.arg(measure)
+  if (measure == "count") {
+    df <- as.data.frame(sapply(object@net, function(x) sum(x$count)))
+    if (is.null(ylabel)) {
+      ylabel = "Number of inferred interactions"
+    }
+  }
+  else if (measure == "weight") {
+    df <- as.data.frame(sapply(object@net, function(x) sum(x$weight)))
+    df[, 1] <- round(df[, 1], digits)
+    if (is.null(ylabel)) {
+      ylabel = "Interaction strength"
+    }
+  }
+  colnames(df) <- "count"
+  df$dataset <- names(object@net)
+  if (is.null(group)) {
+    group <- 1
+  }
+  df$group <- group
+  df$dataset <- factor(df$dataset, levels = names(object@net))
+  if (is.null(group.levels)) {
+    df$group <- factor(df$group)
+  }
+  else {
+    df$group <- factor(df$group, levels = group.levels)
+  }
+  if (is.null(color.use)) {
+    color.use <- ggPalette(length(unique(group)))
+  }
+  if (!is.null(group.facet)) {
+    if (all(group.facet %in% colnames(df))) {
+      gg <- ggplot(df, aes(x = dataset, y = count, fill = group)) + 
+        geom_bar(stat = "identity", width = width, 
+                 position = position_dodge())
+      gg <- gg + facet_wrap(group.facet, nrow = n.row)
+    }
+    else {
+      df$group.facet <- group.facet
+      if (is.null(group.facet.levels)) {
+        df$group.facet <- factor(df$group.facet)
+      }
+      else {
+        df$group.facet <- factor(df$group.facet, levels = group.facet.levels)
+      }
+      gg <- ggplot(df, aes(x = dataset, y = count, fill = group)) + 
+        geom_bar(stat = "identity", width = width, 
+                 position = position_dodge())
+      gg <- gg + facet_wrap(~group.facet, nrow = n.row)
+    }
+  }
+  else {
+    gg <- ggplot(df, aes(x = dataset, y = count, fill = group)) + 
+      geom_bar(stat = "identity", width = width, 
+               position = position_dodge())
+  }
+  gg <- gg + geom_text(aes(label = count), 
+                       vjust = -0.3, 
+                       size = label.size, 
+                       position = position_dodge(0.9))
+  gg <- gg + ylab(ylabel) + xlab(xlabel) + theme_classic() + 
+    labs(title = title.name) + theme(plot.title = element_text(size = 10, 
+                                                               face = "bold", hjust = 0.5)) + theme(text = element_text(size = size.text), 
+                                                                                                    axis.text = element_text(colour = "black"))
+  gg <- gg + scale_fill_manual(values = alpha(color.use, alpha = color.alpha), 
+                               drop = FALSE)
+  if (remove.xtick) {
+    gg <- gg + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  }
+  if (is.null(legend.title)) {
+    gg <- gg + theme(legend.title = element_blank())
+  }
+  else {
+    gg <- gg + guides(fill = guide_legend(legend.title))
+  }
+  if (!show.legend) {
+    gg <- gg + theme(legend.position = "none")
+  }
+  if (x.lab.rot) {
+    gg <- gg + theme(axis.text.x = element_text(angle = angle.x, 
+                                                hjust = hjust.x, vjust = vjust.x, size = size.text))
+  }
+  gg
+  return(gg)
+}
+
+
+myrankSimilarity <- function (object=cellchat, slot.name = "netP",
+                              type = c("functional", "structural"), 
+                              comparison1 = NULL, 
+                              comparison2 = c(1, 2), x.rotation = 90, title = NULL, 
+                              color.use = NULL, bar.w = NULL, 
+                              font.size = 8) 
+{
+  type <- match.arg(type)
+  if (is.null(comparison1)) {
+    comparison1 <- 1:length(unique(object@meta$datasets))
+  }
+  comparison.name <- paste(comparison1, collapse = "-")
+  cat("Compute the distance of signaling networks between datasets", 
+      as.character(comparison1[comparison2]), "\n")
+  comparison2.name <- names(methods::slot(object, slot.name))[comparison1[comparison2]]
+  Y <- methods::slot(object, slot.name)$similarity[[type]]$dr[[comparison.name]]
+  group <- sub(".*--", "", rownames(Y))
+  data1 <- Y[group %in% comparison2.name[1], ]
+  data2 <- Y[group %in% comparison2.name[2], ]
+  rownames(data1) <- sub("--.*", "", rownames(data1))
+  rownames(data2) <- sub("--.*", "", rownames(data2))
+  pathway.show = as.character(intersect(rownames(data1), rownames(data2)))
+  data1 <- data1[pathway.show, ]
+  data2 <- data2[pathway.show, ]
+  euc.dist <- function(x1, x2) sqrt(sum((x1 - x2)^2))
+  dist <- NULL
+  for (i in 1:nrow(data1)) dist[i] <- euc.dist(data1[i, ], data2[i, ])
+  df <- data.frame(name = pathway.show, dist = dist, row.names = pathway.show)
+  df <- df[order(df$dist), , drop = F]
+  df$name <- factor(df$name, levels = as.character(df$name))
+  gg <- ggplot(df, aes(x = name, y = dist)) + 
+    geom_bar(stat = "identity",width = bar.w,fill = color.use) + 
+    theme_classic() + 
+    theme(text = element_text(size = font.size), 
+          axis.title.y = element_text(size = font.size)) + 
+    xlab("") + 
+    ylab("Pathway distance") + 
+    coord_flip()
+  if (!is.null(title)) {
+    gg <- gg + ggtitle(title) + theme(plot.title = element_text(hjust = 0.5))
+  }
+  return(gg)
+}
 
